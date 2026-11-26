@@ -93,7 +93,7 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
   <button class="b" data-cmd="vpersp">3D</button><button class="b" data-cmd="vtop">Top</button><button class="b" data-cmd="vfront">Front</button><button class="b" data-cmd="vright">Side</button><button class="b" data-cmd="focus">Focus<kbd>F</kbd></button><button class="b on" data-cmd="grid">Grid</button><button class="b" data-cmd="wireall">Wire</button>
  </div>
  <div class="grp"><small>File</small>
-  <button class="b pri" data-cmd="export">Export OBJ</button><button class="b" data-cmd="import">Import OBJ</button><button class="b" data-cmd="save">Save project</button><button class="b" data-cmd="open">Open project</button><button class="b" data-cmd="new">New</button>
+  <button class="b pri" data-cmd="expjson">Export JSON</button><button class="b" data-cmd="export">Export…</button><button class="b" data-cmd="import">Import OBJ</button><button class="b" data-cmd="save">Save project</button><button class="b" data-cmd="open">Open project</button><button class="b" data-cmd="new">New</button>
  </div>
 </header>
 
@@ -117,7 +117,8 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
 
 <div id="modal" hidden>
  <div class="card">
-  <h3>Export OBJ</h3>
+  <h3>Export model</h3>
+  <p class="mut">Model JSON keeps every part with its pivot (for your games). OBJ works in Blender and other 3D apps but can't store pivots.</p>
   <label class="f"><span>File name</span><input id="fname" value="model"></label>
   <label class="chk"><input type="radio" name="scope" value="all" checked> All visible objects</label>
   <label class="chk"><input type="radio" name="scope" value="sel"> Selected object only</label>
@@ -125,7 +126,7 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
   <label class="chk"><input type="checkbox" id="pivZero"> Put each object's pivot at 0,0,0 (best when exporting parts one at a time for animation)</label>
   <p class="mut" id="estats"></p>
   <div class="tools">
-   <button class="b pri" data-cmd="dlobj">Download .obj</button><button class="b" data-cmd="dlmtl">Download .mtl</button><button class="b pri" data-cmd="dlpiv">Download model .json</button><button class="b" data-cmd="cppiv">Copy model JSON</button><button class="b" data-cmd="cpobj">Copy OBJ text</button><button class="b" data-cmd="close">Close</button>
+   <button class="b pri" data-cmd="dlpiv">Download model .json</button><button class="b" data-cmd="cppiv">Copy model JSON</button><button class="b" data-cmd="dlobj">Download .obj</button><button class="b" data-cmd="dlmtl">Download .mtl</button><button class="b" data-cmd="cpobj">Copy OBJ text</button><button class="b" data-cmd="close">Close</button>
   </div>
   <textarea id="eout" readonly aria-label="OBJ preview"></textarea>
  </div>
@@ -612,6 +613,7 @@ const CMD={
  dlobj:()=>{const n=fname();saveFile(n+'.obj',buildOBJ())},
  dlmtl:()=>{saveFile(fname()+'.mtl',buildMTL())},
  cpobj:()=>copy(buildOBJ()),
+ expjson:()=>{if(edit)exitEdit();if(!objs.some(o=>o.vis))return toast('Add something to export first');document.querySelector('input[name=scope][value=all]').checked=true;saveFile(fname()+'.model.json',buildModelJSON())},
  dlpiv:()=>saveFile(fname()+'.model.json',buildModelJSON()),
  cppiv:()=>copy(buildModelJSON(),'Model JSON copied'),
  import:()=>$('#fImp').click(),open:()=>$('#fOpen').click(),

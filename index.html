@@ -125,7 +125,7 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
   <label class="chk"><input type="checkbox" id="pivZero"> Put each object's pivot at 0,0,0 (best when exporting parts one at a time for animation)</label>
   <p class="mut" id="estats"></p>
   <div class="tools">
-   <button class="b pri" data-cmd="dlobj">Download .obj</button><button class="b" data-cmd="dlmtl">Download .mtl</button><button class="b" data-cmd="cpobj">Copy OBJ text</button><button class="b" data-cmd="close">Close</button>
+   <button class="b pri" data-cmd="dlobj">Download .obj</button><button class="b" data-cmd="dlmtl">Download .mtl</button><button class="b" data-cmd="dlpiv">Download pivots .json</button><button class="b" data-cmd="cppiv">Copy pivots JSON</button><button class="b" data-cmd="cpobj">Copy OBJ text</button><button class="b" data-cmd="close">Close</button>
   </div>
   <textarea id="eout" readonly aria-label="OBJ preview"></textarea>
  </div>
@@ -612,6 +612,8 @@ const CMD={
  dlobj:()=>{const n=fname();saveFile(n+'.obj',buildOBJ())},
  dlmtl:()=>{saveFile(fname()+'.mtl',buildMTL())},
  cpobj:()=>copy(buildOBJ()),
+ dlpiv:()=>saveFile(fname()+'.pivots.json',buildPivots()),
+ cppiv:()=>copy(buildPivots(),'Pivots JSON copied'),
  import:()=>$('#fImp').click(),open:()=>$('#fOpen').click(),
  save:()=>saveFile('nugget-model-project.json',JSON.stringify({app:'nugget-modeler',v:1,objs,nid})),
  new:()=>{if(edit)exitEdit(true);objs=[];rebuildAll();select(null);commit();toast('New scene (Ctrl+Z brings the old one back)')}
@@ -696,9 +698,24 @@ async function saveFile(name,text){
   a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);toast('Downloading '+name);
  }catch(e){toast('Downloads are blocked here. Use Copy OBJ text.')}
 }
-function copy(text){
+/* pivots JSON: one entry per exported object, names match the OBJ "o" lines */
+function buildPivots(){
+ const zero=$('#pivZero').checked;
+ const out={format:'nugget-pivots',version:1,model:fname()+'.obj',
+  pivotsAtOrigin:zero,
+  note:(zero?'OBJ was exported with each object centred on its pivot: set each mesh position to "pivot".':'OBJ was exported in scene space: put each mesh in a group at "pivot" and set the mesh position to -pivot.')+' Rotation and scale are already baked into the OBJ vertices (listed for reference only). Rotate the mesh/group to animate around the pivot.',
+  objects:exportList().map(o=>{
+   const m=meshes.get(o.id);m.updateMatrixWorld(true);
+   const b=new THREE.Box3().setFromObject(m),q=m.quaternion;
+   return{name:safe(o.name),label:o.name,pivot:o.pos.map(f5),
+    rotation:o.rot.map(f5),rotationRad:o.rot.map(d=>f5(d*D2R)),quaternion:[q.x,q.y,q.z,q.w].map(f5),scale:o.scl.map(f5),
+    bounds:{min:b.min.toArray().map(f5),max:b.max.toArray().map(f5)}};
+  })};
+ return JSON.stringify(out,null,2);
+}
+function copy(text,msg){
  const ta=$('#eout');
- navigator.clipboard.writeText(text).then(()=>toast('OBJ copied to clipboard')).catch(()=>{ta.value=text;ta.focus();ta.select();toast('Press Ctrl+C to copy')});
+ navigator.clipboard.writeText(text).then(()=>toast(msg||'OBJ copied to clipboard')).catch(()=>{ta.value=text;ta.focus();ta.select();toast('Press Ctrl+C to copy')});
 }
 
 /* ---------- import / open ---------- */

@@ -84,7 +84,7 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
   <button class="b" data-add="box">Cube</button><button class="b" data-add="sphere">Sphere</button><button class="b" data-add="cyl">Cylinder</button><button class="b" data-add="cone">Cone</button><button class="b" data-add="pyr">Pyramid</button><button class="b" data-add="prism">Prism</button><button class="b" data-add="torus">Torus</button><button class="b" data-add="ico">Icosphere</button><button class="b" data-add="plane">Plane</button><button class="b" data-add="knot">Knot</button>
  </div>
  <div class="grp"><small>Tool</small>
-  <button class="b on" data-cmd="move">Move<kbd>W</kbd></button><button class="b" data-cmd="rotate">Rotate<kbd>E</kbd></button><button class="b" data-cmd="scale">Scale<kbd>R</kbd></button><button class="b" data-cmd="edit">Edit verts<kbd>Tab</kbd></button><button class="b" data-cmd="snap">Snap</button><button class="b" data-cmd="space">Local</button>
+  <button class="b on" data-cmd="move">Move<kbd>W</kbd></button><button class="b" data-cmd="rotate">Rotate<kbd>E</kbd></button><button class="b" data-cmd="scale">Scale<kbd>R</kbd></button><button class="b" data-cmd="edit">Edit verts<kbd>Tab</kbd></button><button class="b" data-cmd="pivot">Pivot<kbd>P</kbd></button><button class="b" data-cmd="snap">Snap</button><button class="b" data-cmd="space">Local</button>
  </div>
  <div class="grp"><small>Edit</small>
   <button class="b" data-cmd="undo">Undo</button><button class="b" data-cmd="redo">Redo</button><button class="b" data-cmd="dup">Duplicate</button><button class="b" data-cmd="del">Delete</button>
@@ -104,7 +104,7 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
  <p class="mut" id="count"></p>
  <h3 class="s">Shortcuts</h3>
  <ul class="keys">
-  <li><b>W E R</b> move / rotate / scale</li><li><b>Tab</b> vertex edit</li><li><b>Ctrl+D</b> duplicate</li><li><b>Del / X</b> delete</li><li><b>Ctrl+Z</b> undo</li><li><b>Ctrl+Y</b> redo</li><li><b>F</b> focus</li><li><b>H</b> hide</li><li><b>A</b> all verts</li><li><b>Esc</b> deselect</li><li><b>Dbl-click</b> rename</li><li><b>Ctrl+S</b> save</li>
+  <li><b>W E R</b> move / rotate / scale</li><li><b>Tab</b> vertex edit</li><li><b>P</b> pivot mode</li><li><b>Ctrl+D</b> duplicate</li><li><b>Del / X</b> delete</li><li><b>Ctrl+Z</b> undo</li><li><b>Ctrl+Y</b> redo</li><li><b>F</b> focus</li><li><b>H</b> hide</li><li><b>A</b> all verts</li><li><b>Esc</b> deselect</li><li><b>Dbl-click</b> rename</li><li><b>Ctrl+S</b> save</li>
  </ul>
 </aside>
 
@@ -122,6 +122,7 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
   <label class="chk"><input type="radio" name="scope" value="all" checked> All visible objects</label>
   <label class="chk"><input type="radio" name="scope" value="sel"> Selected object only</label>
   <label class="chk"><input type="checkbox" id="wmtl" checked> Include .mtl file (object colours)</label>
+  <label class="chk"><input type="checkbox" id="pivZero"> Put each object's pivot at 0,0,0 (best when exporting parts one at a time for animation)</label>
   <p class="mut" id="estats"></p>
   <div class="tools">
    <button class="b pri" data-cmd="dlobj">Download .obj</button><button class="b" data-cmd="dlmtl">Download .mtl</button><button class="b" data-cmd="cpobj">Copy OBJ text</button><button class="b" data-cmd="close">Close</button>
@@ -185,7 +186,13 @@ const tc=new THREE.TransformControls(camera,renderer.domElement);
 tc.setSize(.9);scene.add(tc);
 
 /* ---------- state ---------- */
-let objs=[],nid=1,sel=null,mode='translate',edit=false,ed=null,snapOn=false,local=false,wireAll=false,multi=false,helper=null;
+let objs=[],nid=1,sel=null,mode='translate',edit=false,ed=null,snapOn=false,local=false,wireAll=false,multi=false,helper=null,pivMode=false;
+/* pivot marker: small axes + dot drawn on top at the selected object's origin */
+const pivMark=new THREE.Group();
+{const ax=new THREE.AxesHelper(.45);ax.material.depthTest=false;ax.renderOrder=6;pivMark.add(ax);
+ const dot=new THREE.Mesh(new THREE.SphereGeometry(.045,12,8),new THREE.MeshBasicMaterial({color:0xffd23f,depthTest:false}));dot.renderOrder=7;pivMark.add(dot)}
+pivMark.visible=false;scene.add(pivMark);
+const pivDummy=new THREE.Object3D();scene.add(pivDummy);
 const meshes=new Map();
 const cur=()=>objs.find(o=>o.id===sel)||null;
 
@@ -208,7 +215,47 @@ function buildGeo(o){
   if(o.custom.i)g.setIndex(o.custom.i);
   g.computeVertexNormals();return g;
  }
- return PRIM[o.type].g(o.params);
+ const g=PRIM[o.type].g(o.params);
+ if(o.off)g.translate(-o.off[0],-o.off[1],-o.off[2]);
+ return g;
+}
+/* move an object's pivot (origin) to a world point without moving the mesh */
+function setOrigin(o,world){
+ const m=meshes.get(o.id);if(!m)return;
+ m.updateMatrixWorld(true);
+ const loc=m.worldToLocal(world.clone());
+ if(loc.lengthSq()<1e-12)return;
+ if(o.custom){const p=o.custom.p;for(let i=0;i<p.length;i+=3){p[i]=r4(p[i]-loc.x);p[i+1]=r4(p[i+1]-loc.y);p[i+2]=r4(p[i+2]-loc.z)}}
+ else{const f=o.off||[0,0,0];o.off=[r4(f[0]+loc.x),r4(f[1]+loc.y),r4(f[2]+loc.z)]}
+ o.pos=[world.x,world.y,world.z].map(r4);
+ applyT(o,m);replaceGeo(o);
+}
+function worldBox(o){const m=meshes.get(o.id);m.updateMatrixWorld(true);return new THREE.Box3().setFromObject(m)}
+function originTo(kind){
+ const o=cur();if(!o)return toast('Select an object first');
+ let w;
+ if(kind==='center')w=worldBox(o).getCenter(new THREE.Vector3());
+ else if(kind==='bottom'){const b=worldBox(o);w=b.getCenter(new THREE.Vector3());w.y=b.min.y}
+ else if(kind==='top'){const b=worldBox(o);w=b.getCenter(new THREE.Vector3());w.y=b.max.y}
+ else if(kind==='world')w=new THREE.Vector3();
+ else if(kind==='verts'){
+  if(!ed||!ed.s.size)return toast('Pick vertices first');
+  const ra=ed.pts.geometry.attributes.position;w=new THREE.Vector3();
+  for(const g of ed.s)w.x+=ra.getX(g),w.y+=ra.getY(g),w.z+=ra.getZ(g);
+  w.divideScalar(ed.s.size);ed.m.updateMatrixWorld(true);w.applyMatrix4(ed.m.matrixWorld);
+  exitEdit(true);setOrigin(o,w);commit();enterEdit();toast('Pivot moved to picked vertices');return;
+ }
+ const was=edit;if(was)exitEdit(true);
+ setOrigin(o,w);commit();if(was)enterEdit();else select(o.id);
+ toast('Pivot moved to '+({center:'centre',bottom:'bottom',top:'top',world:'world origin'})[kind]);
+}
+function togglePivot(){
+ if(edit)exitEdit(true);
+ const o=cur();
+ if(!pivMode&&!o)return toast('Select an object first');
+ if(!pivMode&&o.lock)return toast('Unlock the object first');
+ pivMode=!pivMode;select(sel);btns();
+ if(pivMode)toast('Pivot mode: drag the gizmo to move the pivot, the mesh stays put');
 }
 function applyT(o,m){m.position.fromArray(o.pos);m.rotation.set(o.rot[0]*D2R,o.rot[1]*D2R,o.rot[2]*D2R);m.scale.fromArray(o.scl)}
 function syncFromMesh(o){
@@ -236,6 +283,7 @@ function makeEditable(o){
  if(o.custom)return;
  const g=meshes.get(o.id).geometry;
  o.custom={p:Array.from(g.attributes.position.array,r4),i:g.index?Array.from(g.index.array):null};
+ o.off=null; // the pivot offset is now baked into the vertices
 }
 function dropToFloor(o){
  const m=meshes.get(o.id);if(!m)return;
@@ -262,8 +310,10 @@ function select(id){
  sel=id??null;
  if(helper){scene.remove(helper);helper.geometry.dispose();helper=null}
  const o=cur(),m=o&&meshes.get(o.id);
+ if(pivMode&&!(m&&o.vis&&!o.lock)){pivMode=false;btns()}
  if(!edit){
-  if(m&&o.vis&&!o.lock)tc.attach(m);else tc.detach();
+  if(pivMode){m.updateMatrixWorld(true);pivDummy.position.copy(m.position);pivDummy.quaternion.copy(m.quaternion);tc.setMode('translate');tc.attach(pivDummy)}
+  else if(m&&o.vis&&!o.lock){tc.setMode(mode);tc.attach(m)}else tc.detach();
   if(m&&o.vis){helper=new THREE.BoxHelper(m,0xe4572e);scene.add(helper)}
  }
  renderList();renderProps();hint();
@@ -298,11 +348,11 @@ function resetT(){const o=cur();if(!o)return;o.pos=[0,0,0];o.rot=[0,0,0];o.scl=[
 function floor(){const o=cur();if(!o)return;dropToFloor(o);renderProps();commit()}
 function applyTransform(){
  const o=cur();if(!o)return;if(edit)exitEdit();
- makeEditable(o);const m=meshes.get(o.id);m.updateMatrix();
- const M=m.matrix,v=new THREE.Vector3(),p=o.custom.p;
+ makeEditable(o);const m=meshes.get(o.id);
+ const M=new THREE.Matrix4().compose(new THREE.Vector3(),m.quaternion,m.scale),v=new THREE.Vector3(),p=o.custom.p;
  for(let i=0;i<p.length;i+=3){v.set(p[i],p[i+1],p[i+2]).applyMatrix4(M);p[i]=r4(v.x);p[i+1]=r4(v.y);p[i+2]=r4(v.z)}
  if(M.determinant()<0)flipWinding(o);
- o.pos=[0,0,0];o.rot=[0,0,0];o.scl=[1,1,1];applyT(o,m);replaceGeo(o);select(o.id);commit();toast('Transform applied to mesh');
+ o.rot=[0,0,0];o.scl=[1,1,1];applyT(o,m);replaceGeo(o);select(o.id);commit();toast('Rotation and scale applied (pivot kept)');
 }
 function flipWinding(o){
  const c=o.custom;if(!c.i)c.i=Array.from({length:c.p.length/3},(_,i)=>i);
@@ -337,8 +387,8 @@ function enterEdit(){
  pts.renderOrder=5;m.add(pts);
  const dummy=new THREE.Object3D();m.add(dummy);
  ed={o,m,groups,pts,s:new Set(),dummy,orig:null,inv:null};
- edit=true;if(helper){scene.remove(helper);helper=null}
- tc.detach();colorPts();renderProps();hint();btns();
+ edit=true;pivMode=false;if(helper){scene.remove(helper);helper=null}
+ tc.detach();tc.setMode(mode);colorPts();renderProps();hint();btns();
 }
 function exitEdit(silent){
  if(!ed)return;
@@ -413,11 +463,13 @@ tc.addEventListener('dragging-changed',e=>{
    for(const g of ed.s)ed.orig.set(g,new THREE.Vector3().fromBufferAttribute(ra,g));
   }
  }else{
-  if(edit&&ed){storeVerts();commit()}
+  if(pivMode&&tc.object===pivDummy){const o=cur();if(o){setOrigin(o,pivDummy.position.clone());commit();renderProps();toast('Pivot moved')}}
+  else if(edit&&ed){storeVerts();commit()}
   else{const o=cur();if(o){syncFromMesh(o);commit();renderProps()}}
  }
 });
 tc.addEventListener('objectChange',()=>{
+ if(tc.object===pivDummy)return;
  if(edit&&ed&&tc.object===ed.dummy){if(ed.orig)applyVerts()}
  else{const o=cur();if(o){syncFromMesh(o);fillT(o)}}
 });
@@ -480,7 +532,7 @@ function renderProps(){
  if(edit){
   P.innerHTML=`<h3>Vertex edit</h3><p><b>${esc(o.name)}</b></p><p class="mut" id="vcount"></p>
   <label class="chk"><input type="checkbox" id="multi" ${multi?'checked':''}> Add to selection on each tap</label>
-  <div class="tools"><button class="b" data-cmd="vall">Select all</button><button class="b" data-cmd="vnone">Deselect</button><button class="b" data-cmd="vcollapse">Collapse</button><button class="b" data-cmd="del">Delete</button></div>
+  <div class="tools"><button class="b" data-cmd="vall">Select all</button><button class="b" data-cmd="vnone">Deselect</button><button class="b" data-cmd="vcollapse">Collapse</button><button class="b" data-cmd="del">Delete</button><button class="b" data-cmd="overts">Pivot to picked</button></div>
   <h3 class="s">Mesh tools</h3>
   <label class="f"><span>Noise amount</span><input type="number" id="noiseAmt" step="0.01" value="0.05"></label>
   <div class="tools"><button class="b" data-cmd="noise">Add noise</button><button class="b" data-cmd="flip">Flip normals</button><button class="b pri" data-cmd="edit">Done</button></div>
@@ -501,6 +553,9 @@ function renderProps(){
  <label class="chk"><input type="checkbox" id="pSmooth" ${o.smooth?'checked':''}> Smooth shading</label>
  <label class="chk"><input type="checkbox" id="pWire" ${o.wire?'checked':''}> Wireframe</label>
  <h3 class="s">Shape · ${o.custom?'Mesh':esc(PRIM[o.type].n)}</h3>${shape}
+ <h3 class="s">Pivot</h3>
+ <p class="mut">Rotation and scale happen around the pivot (yellow dot). Put it where the joint is, like a shoulder or a hinge.</p>
+ <div class="tools"><button class="b ${pivMode?'on':''}" data-cmd="pivot">${pivMode?'Done placing':'Place pivot'}</button><button class="b" data-cmd="ocenter">To centre</button><button class="b" data-cmd="obottom">To bottom</button><button class="b" data-cmd="otop">To top</button><button class="b" data-cmd="oworld">To world 0,0,0</button></div>
  <h3 class="s">Tools</h3>
  <div class="tools"><button class="b" data-cmd="edit">Edit vertices</button><button class="b" data-cmd="floor">Drop to floor</button><button class="b" data-cmd="reset">Reset transform</button><button class="b" data-cmd="apply">Apply transform</button></div>
  <div class="tools"><button class="b" data-cmd="mx">Mirror X</button><button class="b" data-cmd="my">Mirror Y</button><button class="b" data-cmd="mz">Mirror Z</button></div>
@@ -532,16 +587,18 @@ RP.addEventListener('change',e=>{
 });
 
 /* ---------- toolbar / commands ---------- */
-function setMode(m){mode=m;tc.setMode(m);btns();hint()}
+function setMode(m){if(pivMode){pivMode=false;select(sel)}mode=m;tc.setMode(m);btns();hint()}
 function btns(){
- const on={move:mode==='translate',rotate:mode==='rotate',scale:mode==='scale',edit,snap:snapOn,space:local,grid:grid.visible,wireall:wireAll};
+ const on={move:mode==='translate'&&!pivMode,rotate:mode==='rotate'&&!pivMode,scale:mode==='scale'&&!pivMode,edit,pivot:pivMode,snap:snapOn,space:local,grid:grid.visible,wireall:wireAll};
  for(const b of document.querySelectorAll('header [data-cmd]'))if(b.dataset.cmd in on)b.classList.toggle('on',on[b.dataset.cmd]);
 }
 function hint(){
  const o=cur();
+ if(pivMode&&o){$('#hint').textContent=`${o.name} · Pivot mode: drag to place the pivot`;return}
  $('#hint').textContent=edit?`Vertex edit · ${ed.o.name} · ${({translate:'Move',rotate:'Rotate',scale:'Scale'})[mode]}`:(o?`${o.name} · ${({translate:'Move',rotate:'Rotate',scale:'Scale'})[mode]}${o.lock?' · locked':''}`:'Object mode · click a shape to select');
 }
 const CMD={
+ pivot:togglePivot,ocenter:()=>originTo('center'),obottom:()=>originTo('bottom'),otop:()=>originTo('top'),oworld:()=>originTo('world'),overts:()=>originTo('verts'),
  move:()=>setMode('translate'),rotate:()=>setMode('rotate'),scale:()=>setMode('scale'),edit:toggleEdit,
  snap:()=>{snapOn=!snapOn;tc.setTranslationSnap(snapOn?.25:null);tc.setRotationSnap(snapOn?15*D2R:null);tc.setScaleSnap(snapOn?.1:null);btns();toast(snapOn?'Snap on: 0.25 units, 15°, 0.1 scale':'Snap off')},
  space:()=>{local=!local;tc.setSpace(local?'local':'world');btns()},
@@ -573,7 +630,7 @@ addEventListener('keydown',e=>{
  if(c&&k==='d'){e.preventDefault();dup();return}
  if(c&&k==='s'){e.preventDefault();CMD.save();return}
  if(c||e.altKey)return;
- const map={w:CMD.move,e:CMD.rotate,r:CMD.scale,f:focus,h:()=>toggleVis(),delete:del,backspace:del,x:del,a:selAllVerts,g:CMD.grid};
+ const map={w:CMD.move,e:CMD.rotate,r:CMD.scale,f:focus,p:togglePivot,h:()=>toggleVis(),delete:del,backspace:del,x:del,a:selAllVerts,g:CMD.grid};
  if(k==='tab'){e.preventDefault();toggleEdit();return}
  if(k==='escape'){if(!$('#modal').hidden)$('#modal').hidden=true;else if(edit)exitEdit();else select(null);return}
  if(map[k]){e.preventDefault();map[k]()}
@@ -596,9 +653,10 @@ function buildOBJ(){
   const m=meshes.get(o.id);m.updateMatrixWorld(true);
   const g=m.geometry,pa=g.attributes.position;let na=g.attributes.normal;
   if(!na){g.computeVertexNormals();na=g.attributes.normal}
-  nm.getNormalMatrix(m.matrixWorld);
-  L.push('o '+safe(o.name));if(mtl)L.push('usemtl mat_'+safe(o.name));
-  for(let i=0;i<pa.count;i++){v.fromBufferAttribute(pa,i).applyMatrix4(m.matrixWorld);L.push(`v ${f5(v.x)} ${f5(v.y)} ${f5(v.z)}`)}
+  const MW=$('#pivZero').checked?new THREE.Matrix4().compose(new THREE.Vector3(),m.quaternion,m.scale):m.matrixWorld;
+  nm.getNormalMatrix(MW);
+  L.push('o '+safe(o.name));L.push(`# pivot ${o.pos.map(f5).join(' ')}`);if(mtl)L.push('usemtl mat_'+safe(o.name));
+  for(let i=0;i<pa.count;i++){v.fromBufferAttribute(pa,i).applyMatrix4(MW);L.push(`v ${f5(v.x)} ${f5(v.y)} ${f5(v.z)}`)}
   const useN=o.smooth;
   if(useN)for(let i=0;i<na.count;i++){v.fromBufferAttribute(na,i).applyMatrix3(nm).normalize();L.push(`vn ${f5(v.x)} ${f5(v.y)} ${f5(v.z)}`)}
   L.push('s '+(o.smooth?1:'off'));
@@ -699,7 +757,10 @@ rebuildAll();last=snap();select(null);btns();
 
 function resize(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
 const ro=new ResizeObserver(resize);ro.observe(vp);resize();
-(function loop(){requestAnimationFrame(loop);orbit.update();if(helper)helper.update();renderer.render(scene,camera)})();
+(function loop(){requestAnimationFrame(loop);orbit.update();if(helper)helper.update();
+ {const o=cur(),m=o&&meshes.get(o.id);pivMark.visible=!!(m&&m.visible);
+  if(pivMark.visible){if(pivMode&&tc.object===pivDummy)pivMark.position.copy(pivDummy.position);else pivMark.position.copy(m.position);pivMark.quaternion.copy(m.quaternion)}}
+ renderer.render(scene,camera)})();
 }
 </script>
 </body>

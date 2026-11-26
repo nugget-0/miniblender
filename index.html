@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nugget Modeler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a focused workshop tool, calm and precise
+   IDEA: a modeling bench — toolbar on top, outliner left, inspector right
+   PICTURE: the live 3D viewport is the picture, filling the centre
+   COLOUR and TYPE: warm graphite / bone panels, one clay-orange accent; Manrope
+   LAYOUT: three columns on desktop, viewport then panels stacked on phones */
+:root{color-scheme:light dark;--bg:light-dark(#e9e6e1,#151619);--panel:light-dark(#faf9f7,#1f2024);--line:light-dark(#d8d4cd,#33353b);--ink:light-dark(#1c1d1f,#ecebe8);--mut:light-dark(#6d6b66,#9a9892);--acc:#e4572e;--accs:light-dark(#fbe0d6,#46261c);--vp:light-dark(#d9d5cf,#2a2c31);--in:light-dark(#fff,#16171a)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Manrope,system-ui,sans-serif;overflow:hidden}
+#app{display:grid;grid-template-columns:230px minmax(0,1fr) 280px;grid-template-rows:auto minmax(0,1fr) auto;height:100dvh}
+header{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px}
+.brand i{width:14px;height:14px;border-radius:4px;background:var(--acc);display:inline-block;transform:rotate(45deg)}
+.grp{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.grp>small{color:var(--mut);font-size:12px;margin-right:2px}
+.b{height:32px;min-width:32px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:transparent;color:inherit;font:600 13px Manrope,system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.b:hover{border-color:var(--acc)}
+.b:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.b.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.b.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.b kbd{font:11px Manrope,sans-serif;opacity:.65;margin-left:4px}
+#vp{position:relative;background:var(--vp);overflow:hidden}
+#vp canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hint{position:absolute;left:10px;top:10px;padding:5px 9px;border-radius:7px;background:color-mix(in srgb,var(--panel) 85%,transparent);font-size:12px;pointer-events:none}
+aside{overflow:auto;background:var(--panel);padding:12px}
+#left{border-right:1px solid var(--line)}#right{border-left:1px solid var(--line)}
+h3{margin:4px 0 10px;font-size:13px;font-weight:700}
+h3.s{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
+.mut{color:var(--mut);font-size:13px}
+input{font:inherit;color:inherit;background:var(--in);border:1px solid var(--line);border-radius:7px;padding:5px 7px;width:100%}
+input[type=color]{padding:2px;height:32px}
+input[type=checkbox],input[type=radio]{width:auto;accent-color:var(--acc)}
+input[type=range]{padding:0;border:0;background:none;accent-color:var(--acc)}
+#list{list-style:none;margin:8px 0 0;padding:0}
+#list li{display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:7px;cursor:pointer}
+#list li:hover{background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#list li.on{background:var(--accs)}
+#list li.empty{cursor:default;color:var(--mut);font-size:13px}
+#list .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#list li.hid .nm{opacity:.45}
+.ib{width:26px;height:26px;border:0;background:none;color:var(--mut);border-radius:6px;cursor:pointer;display:grid;place-items:center;padding:0}
+.ib:hover{color:var(--ink)}.ib svg{width:15px;height:15px}
+.f{display:grid;grid-template-columns:96px minmax(0,1fr);gap:8px;align-items:center;margin:6px 0}
+.f>span,.f3>span{font-size:12px;color:var(--mut)}
+.f3{display:grid;grid-template-columns:60px repeat(3,minmax(0,1fr));gap:4px;align-items:center;margin:6px 0}
+.f3 input{padding:5px 4px;font-size:12px}
+.chk{display:flex;gap:8px;align-items:center;margin:7px 0;cursor:pointer}
+.tools{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
+footer{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px;padding:5px 12px;font-size:12px;color:var(--mut);background:var(--panel);border-top:1px solid var(--line)}
+#msg{color:var(--acc);font-weight:600}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px;z-index:9}
+#modal[hidden]{display:none}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(560px,100%);max-height:90dvh;overflow:auto}
+.card h3{font-size:18px}
+textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var(--in);color:inherit;border:1px solid var(--line);border-radius:8px;padding:8px}
+.keys{font-size:12px;color:var(--mut);columns:2;column-gap:12px;margin:0;padding:0;list-style:none}
+.keys b{color:var(--ink)}
+@media(max-width:820px){
+ body{overflow:auto}
+ #app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 58vh auto auto auto;height:auto}
+ #left,#right{border:0;border-top:1px solid var(--line)}
+ .b{height:40px;min-width:40px}
+ input{font-size:16px}
+ .f3 input{font-size:14px}
+}
+@media(prefers-reduced-motion:no-preference){.b{transition:background .15s,border-color .15s}}
+</style>
+</head>
+<body>
+<div id="app">
+<header>
+ <div class="brand"><i></i>Nugget Modeler</div>
+ <div class="grp"><small>Add</small>
+  <button class="b" data-add="box">Cube</button><button class="b" data-add="sphere">Sphere</button><button class="b" data-add="cyl">Cylinder</button><button class="b" data-add="cone">Cone</button><button class="b" data-add="pyr">Pyramid</button><button class="b" data-add="prism">Prism</button><button class="b" data-add="torus">Torus</button><button class="b" data-add="ico">Icosphere</button><button class="b" data-add="plane">Plane</button><button class="b" data-add="knot">Knot</button>
+ </div>
+ <div class="grp"><small>Tool</small>
+  <button class="b on" data-cmd="move">Move<kbd>W</kbd></button><button class="b" data-cmd="rotate">Rotate<kbd>E</kbd></button><button class="b" data-cmd="scale">Scale<kbd>R</kbd></button><button class="b" data-cmd="edit">Edit verts<kbd>Tab</kbd></button><button class="b" data-cmd="snap">Snap</button><button class="b" data-cmd="space">Local</button>
+ </div>
+ <div class="grp"><small>Edit</small>
+  <button class="b" data-cmd="undo">Undo</button><button class="b" data-cmd="redo">Redo</button><button class="b" data-cmd="dup">Duplicate</button><button class="b" data-cmd="del">Delete</button>
+ </div>
+ <div class="grp"><small>View</small>
+  <button class="b" data-cmd="vpersp">3D</button><button class="b" data-cmd="vtop">Top</button><button class="b" data-cmd="vfront">Front</button><button class="b" data-cmd="vright">Side</button><button class="b" data-cmd="focus">Focus<kbd>F</kbd></button><button class="b on" data-cmd="grid">Grid</button><button class="b" data-cmd="wireall">Wire</button>
+ </div>
+ <div class="grp"><small>File</small>
+  <button class="b pri" data-cmd="export">Export OBJ</button><button class="b" data-cmd="import">Import OBJ</button><button class="b" data-cmd="save">Save project</button><button class="b" data-cmd="open">Open project</button><button class="b" data-cmd="new">New</button>
+ </div>
+</header>
+
+<aside id="left">
+ <h3>Outliner</h3>
+ <input id="q" placeholder="Search objects" aria-label="Search objects">
+ <ul id="list"></ul>
+ <p class="mut" id="count"></p>
+ <h3 class="s">Shortcuts</h3>
+ <ul class="keys">
+  <li><b>W E R</b> move / rotate / scale</li><li><b>Tab</b> vertex edit</li><li><b>Ctrl+D</b> duplicate</li><li><b>Del / X</b> delete</li><li><b>Ctrl+Z</b> undo</li><li><b>Ctrl+Y</b> redo</li><li><b>F</b> focus</li><li><b>H</b> hide</li><li><b>A</b> all verts</li><li><b>Esc</b> deselect</li><li><b>Dbl-click</b> rename</li><li><b>Ctrl+S</b> save</li>
+ </ul>
+</aside>
+
+<main id="vp"><div id="hint">Object mode</div></main>
+
+<aside id="right"><div id="props"></div></aside>
+
+<footer><span id="stat"></span><span id="msg"></span></footer>
+</div>
+
+<div id="modal" hidden>
+ <div class="card">
+  <h3>Export OBJ</h3>
+  <label class="f"><span>File name</span><input id="fname" value="model"></label>
+  <label class="chk"><input type="radio" name="scope" value="all" checked> All visible objects</label>
+  <label class="chk"><input type="radio" name="scope" value="sel"> Selected object only</label>
+  <label class="chk"><input type="checkbox" id="wmtl" checked> Include .mtl file (object colours)</label>
+  <p class="mut" id="estats"></p>
+  <div class="tools">
+   <button class="b pri" data-cmd="dlobj">Download .obj</button><button class="b" data-cmd="dlmtl">Download .mtl</button><button class="b" data-cmd="cpobj">Copy OBJ text</button><button class="b" data-cmd="close">Close</button>
+  </div>
+  <textarea id="eout" readonly aria-label="OBJ preview"></textarea>
+ </div>
+</div>
+
+<input type="file" id="fOpen" accept=".json,application/json" hidden>
+<input type="file" id="fImp" accept=".obj" hidden>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+<script>
+{
+const $=s=>document.querySelector(s);
+const D2R=Math.PI/180,R2D=180/Math.PI;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const r4=n=>Math.round(n*1e4)/1e4;
+const KEY='nugget-modeler-v1';
+const PAL=['#e4572e','#4f86c6','#f3a712','#6c9a8b','#a06cd5','#d8d2c8','#3b3f46','#c94f7c'];
+const ICON={eye:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+ eyeOff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3 3.6M6.6 6.6A17 17 0 0 0 2 12s4 7 10 7a9.6 9.6 0 0 0 4.4-1"/></svg>',
+ lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+ unlock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" opacity=".5"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>'};
+
+const PRIM={
+ box:{n:'Cube',p:{w:1,h:1,d:1,seg:1},g:p=>new THREE.BoxGeometry(p.w,p.h,p.d,p.seg,p.seg,p.seg)},
+ sphere:{n:'Sphere',p:{r:.6,ws:24,hs:16},g:p=>new THREE.SphereGeometry(p.r,p.ws,p.hs)},
+ cyl:{n:'Cylinder',p:{rt:.5,rb:.5,h:1,seg:24},g:p=>new THREE.CylinderGeometry(p.rt,p.rb,p.h,p.seg)},
+ cone:{n:'Cone',p:{r:.5,h:1,seg:24},g:p=>new THREE.ConeGeometry(p.r,p.h,p.seg)},
+ pyr:{n:'Pyramid',p:{r:.7,h:1,sides:4},g:p=>new THREE.ConeGeometry(p.r,p.h,p.sides)},
+ prism:{n:'Prism',p:{r:.6,h:1,sides:3},g:p=>new THREE.CylinderGeometry(p.r,p.r,p.h,p.sides)},
+ torus:{n:'Torus',p:{R:.6,t:.2,rs:16,ts:32},g:p=>new THREE.TorusGeometry(p.R,p.t,p.rs,p.ts)},
+ ico:{n:'Icosphere',p:{r:.6,detail:1},g:p=>new THREE.IcosahedronGeometry(p.r,p.detail)},
+ plane:{n:'Plane',p:{w:2,h:2,seg:1},g:p=>new THREE.PlaneGeometry(p.w,p.h,p.seg,p.seg).rotateX(-Math.PI/2)},
+ knot:{n:'Knot',p:{r:.5,t:.15,ts:96,rs:12,p:2,q:3},g:p=>new THREE.TorusKnotGeometry(p.r,p.t,p.ts,p.rs,p.p,p.q)}
+};
+const LBL={w:'Width',h:'Height',d:'Depth',seg:'Segments',r:'Radius',ws:'Width segs',hs:'Height segs',rt:'Top radius',rb:'Bottom radius',R:'Ring radius',t:'Thickness',rs:'Radial segs',ts:'Tube segs',sides:'Sides',detail:'Detail',p:'Winds P',q:'Winds Q'};
+const IMIN={seg:1,ws:3,hs:2,rs:2,ts:3,sides:3,detail:0,p:1,q:1};
+const SMOOTH=new Set(['sphere','cyl','cone','torus','knot','custom']);
+
+/* ---------- three setup ---------- */
+const vp=$('#vp');
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setClearColor(0x000000,0);
+vp.appendChild(renderer.domElement);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(50,1,0.01,2000);
+camera.position.set(5,4,6);
+const orbit=new THREE.OrbitControls(camera,renderer.domElement);
+orbit.enableDamping=true;orbit.target.set(0,.6,0);
+scene.add(new THREE.HemisphereLight(0xffffff,0x55524c,0.85));
+const sun=new THREE.DirectionalLight(0xffffff,0.85);sun.position.set(5,10,7);scene.add(sun);
+const grid=new THREE.GridHelper(20,40,0x8a867f,0x8a867f);grid.material.transparent=true;grid.material.opacity=.4;scene.add(grid);
+const axes=new THREE.AxesHelper(1.2);axes.material.depthTest=false;axes.renderOrder=1;scene.add(axes);
+const root=new THREE.Group();scene.add(root);
+const tc=new THREE.TransformControls(camera,renderer.domElement);
+tc.setSize(.9);scene.add(tc);
+
+/* ---------- state ---------- */
+let objs=[],nid=1,sel=null,mode='translate',edit=false,ed=null,snapOn=false,local=false,wireAll=false,multi=false,helper=null;
+const meshes=new Map();
+const cur=()=>objs.find(o=>o.id===sel)||null;
+
+function uniqueName(base,selfId){
+ base=String(base).trim()||'Object';
+ const taken=n=>objs.some(o=>o.name===n&&o.id!==selfId);
+ if(!taken(base))return base;
+ const stem=base.replace(/\.\d{3}$/,'');let i=1,n;
+ do n=stem+'.'+String(i++).padStart(3,'0');while(taken(n));
+ return n;
+}
+function newObj(type,name){
+ const P=PRIM[type];
+ return{id:nid++,name:uniqueName(name||(P?P.n:'Mesh')),type,params:P?{...P.p}:{},color:PAL[(nid-2)%PAL.length],rough:.55,metal:0,smooth:SMOOTH.has(type),wire:false,vis:true,lock:false,pos:[0,0,0],rot:[0,0,0],scl:[1,1,1],custom:null};
+}
+function buildGeo(o){
+ if(o.custom){
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(o.custom.p,3));
+  if(o.custom.i)g.setIndex(o.custom.i);
+  g.computeVertexNormals();return g;
+ }
+ return PRIM[o.type].g(o.params);
+}
+function applyT(o,m){m.position.fromArray(o.pos);m.rotation.set(o.rot[0]*D2R,o.rot[1]*D2R,o.rot[2]*D2R);m.scale.fromArray(o.scl)}
+function syncFromMesh(o){
+ const m=meshes.get(o.id);if(!m)return;
+ o.pos=m.position.toArray().map(r4);
+ o.rot=[m.rotation.x,m.rotation.y,m.rotation.z].map(r=>r4(r*R2D));
+ o.scl=m.scale.toArray().map(r4);
+}
+function makeMesh(o){
+ const m=new THREE.Mesh(buildGeo(o),new THREE.MeshStandardMaterial({color:o.color,roughness:o.rough,metalness:o.metal,flatShading:!o.smooth,wireframe:o.wire||wireAll,side:THREE.DoubleSide}));
+ m.userData.id=o.id;applyT(o,m);m.visible=o.vis;return m;
+}
+function updMat(o){
+ const m=meshes.get(o.id);if(!m)return;const mt=m.material;
+ mt.color.set(o.color);mt.roughness=o.rough;mt.metalness=o.metal;mt.wireframe=o.wire||wireAll;
+ if(mt.flatShading!==!o.smooth){mt.flatShading=!o.smooth;mt.needsUpdate=true}
+}
+function replaceGeo(o){const m=meshes.get(o.id);if(!m)return;m.geometry.dispose();m.geometry=buildGeo(o)}
+function rebuildAll(){
+ for(const m of meshes.values()){root.remove(m);m.geometry.dispose();m.material.dispose()}
+ meshes.clear();
+ for(const o of objs){const m=makeMesh(o);root.add(m);meshes.set(o.id,m)}
+}
+function makeEditable(o){
+ if(o.custom)return;
+ const g=meshes.get(o.id).geometry;
+ o.custom={p:Array.from(g.attributes.position.array,r4),i:g.index?Array.from(g.index.array):null};
+}
+function dropToFloor(o){
+ const m=meshes.get(o.id);if(!m)return;
+ m.updateMatrixWorld(true);
+ const b=new THREE.Box3().setFromObject(m);
+ if(isFinite(b.min.y)){m.position.y-=b.min.y;syncFromMesh(o)}
+}
+
+/* ---------- undo / save ---------- */
+let undo=[],redo=[],last='';
+const snap=()=>JSON.stringify({objs,nid});
+function persist(){try{localStorage.setItem(KEY,last)}catch(e){}}
+function commit(){const s=snap();if(s===last)return;undo.push(last);if(undo.length>100)undo.shift();redo=[];last=s;persist();stats()}
+function restore(s){
+ if(edit)exitEdit(true);
+ const d=JSON.parse(s);objs=d.objs;nid=d.nid;rebuildAll();
+ if(!cur())sel=null;select(sel);persist();
+}
+function doUndo(){if(!undo.length)return toast('Nothing to undo');redo.push(last);last=undo.pop();restore(last);toast('Undo')}
+function doRedo(){if(!redo.length)return toast('Nothing to redo');undo.push(last);last=redo.pop();restore(last);toast('Redo')}
+
+/* ---------- selection ---------- */
+function select(id){
+ sel=id??null;
+ if(helper){scene.remove(helper);helper.geometry.dispose();helper=null}
+ const o=cur(),m=o&&meshes.get(o.id);
+ if(!edit){
+  if(m&&o.vis&&!o.lock)tc.attach(m);else tc.detach();
+  if(m&&o.vis){helper=new THREE.BoxHelper(m,0xe4572e);scene.add(helper)}
+ }
+ renderList();renderProps();hint();
+}
+
+/* ---------- objects ---------- */
+function addPrim(type){
+ if(edit)exitEdit();
+ const o=newObj(type);
+ const t=orbit.target;o.pos=[r4(Math.round(t.x*2)/2),0,r4(Math.round(t.z*2)/2)];
+ objs.push(o);const m=makeMesh(o);root.add(m);meshes.set(o.id,m);
+ dropToFloor(o);select(o.id);commit();toast('Added '+o.name);
+}
+function dup(){
+ const o=cur();if(!o)return;if(edit)exitEdit();
+ const c=JSON.parse(JSON.stringify(o));c.id=nid++;c.name=uniqueName(o.name);c.pos[0]=r4(c.pos[0]+.5);c.lock=false;
+ objs.push(c);const m=makeMesh(c);root.add(m);meshes.set(c.id,m);select(c.id);commit();toast('Duplicated as '+c.name);
+}
+function del(){
+ if(edit)return delVerts();
+ const o=cur();if(!o)return;
+ const m=meshes.get(o.id);tc.detach();root.remove(m);m.geometry.dispose();m.material.dispose();meshes.delete(o.id);
+ objs=objs.filter(x=>x!==o);select(null);commit();toast('Deleted '+o.name+' (Ctrl+Z to undo)');
+}
+function toggleVis(id){
+ const o=id?objs.find(x=>x.id===id):cur();if(!o)return;
+ o.vis=!o.vis;meshes.get(o.id).visible=o.vis;if(edit&&ed.o===o)exitEdit();select(sel);commit();
+}
+function toggleLock(id){const o=objs.find(x=>x.id===id);if(!o)return;o.lock=!o.lock;if(edit&&ed.o===o)exitEdit();select(sel);commit()}
+function mirror(ax){const o=cur();if(!o)return;o.scl[ax]=-o.scl[ax];applyT(o,meshes.get(o.id));renderProps();commit();toast('Mirrored on '+'XYZ'[ax])}
+function resetT(){const o=cur();if(!o)return;o.pos=[0,0,0];o.rot=[0,0,0];o.scl=[1,1,1];applyT(o,meshes.get(o.id));dropToFloor(o);renderProps();commit()}
+function floor(){const o=cur();if(!o)return;dropToFloor(o);renderProps();commit()}
+function applyTransform(){
+ const o=cur();if(!o)return;if(edit)exitEdit();
+ makeEditable(o);const m=meshes.get(o.id);m.updateMatrix();
+ const M=m.matrix,v=new THREE.Vector3(),p=o.custom.p;
+ for(let i=0;i<p.length;i+=3){v.set(p[i],p[i+1],p[i+2]).applyMatrix4(M);p[i]=r4(v.x);p[i+1]=r4(v.y);p[i+2]=r4(v.z)}
+ if(M.determinant()<0)flipWinding(o);
+ o.pos=[0,0,0];o.rot=[0,0,0];o.scl=[1,1,1];applyT(o,m);replaceGeo(o);select(o.id);commit();toast('Transform applied to mesh');
+}
+function flipWinding(o){
+ const c=o.custom;if(!c.i)c.i=Array.from({length:c.p.length/3},(_,i)=>i);
+ for(let t=0;t<c.i.length;t+=3){const b=c.i[t+1];c.i[t+1]=c.i[t+2];c.i[t+2]=b}
+}
+function flipNormals(){const o=cur();if(!o)return;const was=edit;if(was)exitEdit(true);makeEditable(o);flipWinding(o);replaceGeo(o);commit();if(was)enterEdit();else renderProps();toast('Normals flipped')}
+function noise(){
+ const o=cur();if(!o)return;const amt=parseFloat(($('#noiseAmt')||{}).value)||.05;
+ const was=edit;if(was)exitEdit(true);makeEditable(o);
+ const p=o.custom.p,map=new Map();
+ for(let i=0;i<p.length;i+=3){const k=p[i].toFixed(4)+','+p[i+1].toFixed(4)+','+p[i+2].toFixed(4);let d=map.get(k);if(!d){d=[0,1,2].map(()=>(Math.random()*2-1)*amt);map.set(k,d)}p[i]=r4(p[i]+d[0]);p[i+1]=r4(p[i+1]+d[1]);p[i+2]=r4(p[i+2]+d[2])}
+ replaceGeo(o);commit();if(was)enterEdit();else renderProps();toast('Noise applied');
+}
+function convert(){const o=cur();if(!o||o.custom)return;makeEditable(o);replaceGeo(o);commit();renderProps();toast('Converted to editable mesh')}
+
+/* ---------- vertex edit ---------- */
+function enterEdit(){
+ const o=cur();if(!o)return toast('Select an object first');
+ if(!o.vis||o.lock)return toast('Show and unlock the object to edit it');
+ const fresh=!o.custom;makeEditable(o);if(fresh){replaceGeo(o);commit()}
+ const m=meshes.get(o.id),pa=m.geometry.attributes.position;
+ const map=new Map(),groups=[],rep=[];
+ for(let i=0;i<pa.count;i++){
+  const k=pa.getX(i).toFixed(4)+','+pa.getY(i).toFixed(4)+','+pa.getZ(i).toFixed(4);
+  let g=map.get(k);if(g===undefined){g=groups.length;map.set(k,g);groups.push([]);rep.push(pa.getX(i),pa.getY(i),pa.getZ(i))}
+  groups[g].push(i);
+ }
+ const pg=new THREE.BufferGeometry();
+ pg.setAttribute('position',new THREE.Float32BufferAttribute(rep,3));
+ pg.setAttribute('color',new THREE.BufferAttribute(new Float32Array(groups.length*3),3));
+ const pts=new THREE.Points(pg,new THREE.PointsMaterial({size:8,sizeAttenuation:false,vertexColors:true,depthTest:false}));
+ pts.renderOrder=5;m.add(pts);
+ const dummy=new THREE.Object3D();m.add(dummy);
+ ed={o,m,groups,pts,s:new Set(),dummy,orig:null,inv:null};
+ edit=true;if(helper){scene.remove(helper);helper=null}
+ tc.detach();colorPts();renderProps();hint();btns();
+}
+function exitEdit(silent){
+ if(!ed)return;
+ ed.m.remove(ed.pts);ed.pts.geometry.dispose();ed.pts.material.dispose();ed.m.remove(ed.dummy);
+ tc.detach();ed=null;edit=false;btns();if(!silent)select(sel);
+}
+function toggleEdit(){edit?exitEdit():enterEdit()}
+function colorPts(){
+ const c=ed.pts.geometry.attributes.color;
+ for(let g=0;g<ed.groups.length;g++){if(ed.s.has(g))c.setXYZ(g,1,.38,.15);else c.setXYZ(g,.25,.55,1)}
+ c.needsUpdate=true;
+}
+function vertGizmo(){
+ colorPts();
+ if(ed.s.size){
+  const ra=ed.pts.geometry.attributes.position,c=new THREE.Vector3();
+  for(const g of ed.s)c.x+=ra.getX(g),c.y+=ra.getY(g),c.z+=ra.getZ(g);
+  c.divideScalar(ed.s.size);ed.dummy.position.copy(c);ed.dummy.rotation.set(0,0,0);ed.dummy.scale.set(1,1,1);tc.attach(ed.dummy);
+ }else tc.detach();
+ updVcount();
+}
+function pickVert(px,py,add){
+ const ra=ed.pts.geometry.attributes.position,v=new THREE.Vector3(),w=renderer.domElement.clientWidth,h=renderer.domElement.clientHeight;
+ ed.m.updateMatrixWorld(true);let best=-1,bd=16*16;
+ for(let g=0;g<ed.groups.length;g++){
+  v.fromBufferAttribute(ra,g).applyMatrix4(ed.m.matrixWorld).project(camera);
+  if(v.z>1||v.z<-1)continue;
+  const d=((v.x+1)/2*w-px)**2+((1-v.y)/2*h-py)**2;if(d<bd){bd=d;best=g}
+ }
+ if(!add)ed.s.clear();
+ if(best>=0){if(add&&ed.s.has(best))ed.s.delete(best);else ed.s.add(best)}
+ vertGizmo();
+}
+function selAllVerts(){if(!ed)return;if(ed.s.size===ed.groups.length)ed.s.clear();else ed.groups.forEach((_,g)=>ed.s.add(g));vertGizmo()}
+function applyVerts(){
+ ed.dummy.updateMatrix();
+ const M=ed.dummy.matrix.clone().multiply(ed.inv),pa=ed.m.geometry.attributes.position,ra=ed.pts.geometry.attributes.position,v=new THREE.Vector3();
+ for(const [g,o0] of ed.orig){v.copy(o0).applyMatrix4(M);ra.setXYZ(g,v.x,v.y,v.z);for(const i of ed.groups[g])pa.setXYZ(i,v.x,v.y,v.z)}
+ pa.needsUpdate=ra.needsUpdate=true;
+ const geo=ed.m.geometry;geo.computeVertexNormals();geo.computeBoundingSphere();geo.computeBoundingBox();ed.pts.geometry.computeBoundingSphere();
+}
+function storeVerts(){ed.o.custom.p=Array.from(ed.m.geometry.attributes.position.array,r4)}
+function setTris(o,tris){
+ const p0=o.custom.p,map=new Map(),p=[],idx=[];
+ for(const i of tris){let n=map.get(i);if(n===undefined){n=map.size;map.set(i,n);p.push(p0[i*3],p0[i*3+1],p0[i*3+2])}idx.push(n)}
+ o.custom={p,i:idx};
+}
+function delVerts(){
+ if(!ed.s.size)return toast('Pick some vertices first');
+ const o=ed.o,dead=new Set();for(const g of ed.s)for(const i of ed.groups[g])dead.add(i);
+ const idx=o.custom.i||Array.from({length:o.custom.p.length/3},(_,i)=>i),keep=[];
+ for(let t=0;t<idx.length;t+=3)if(!dead.has(idx[t])&&!dead.has(idx[t+1])&&!dead.has(idx[t+2]))keep.push(idx[t],idx[t+1],idx[t+2]);
+ setTris(o,keep);exitEdit(true);replaceGeo(o);commit();enterEdit();toast('Deleted vertices and their faces');
+}
+function collapse(){
+ if(!ed||ed.s.size<2)return toast('Pick 2 or more vertices to collapse');
+ const ra=ed.pts.geometry.attributes.position,c=new THREE.Vector3();
+ for(const g of ed.s)c.x+=ra.getX(g),c.y+=ra.getY(g),c.z+=ra.getZ(g);c.divideScalar(ed.s.size);
+ const p=ed.o.custom.p;
+ for(const g of ed.s)for(const i of ed.groups[g]){p[i*3]=r4(c.x);p[i*3+1]=r4(c.y);p[i*3+2]=r4(c.z)}
+ const o=ed.o;exitEdit(true);replaceGeo(o);commit();enterEdit();toast('Vertices collapsed');
+}
+function updVcount(){const e=$('#vcount');if(e&&ed)e.textContent=ed.s.size+' of '+ed.groups.length+' vertices picked'}
+
+/* ---------- transform control events ---------- */
+tc.addEventListener('dragging-changed',e=>{
+ orbit.enabled=!e.value;
+ if(e.value){
+  if(edit&&ed&&tc.object===ed.dummy){
+   ed.dummy.updateMatrix();ed.inv=ed.dummy.matrix.clone().invert();ed.orig=new Map();
+   const ra=ed.pts.geometry.attributes.position;
+   for(const g of ed.s)ed.orig.set(g,new THREE.Vector3().fromBufferAttribute(ra,g));
+  }
+ }else{
+  if(edit&&ed){storeVerts();commit()}
+  else{const o=cur();if(o){syncFromMesh(o);commit();renderProps()}}
+ }
+});
+tc.addEventListener('objectChange',()=>{
+ if(edit&&ed&&tc.object===ed.dummy){if(ed.orig)applyVerts()}
+ else{const o=cur();if(o){syncFromMesh(o);fillT(o)}}
+});
+
+/* ---------- picking ---------- */
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY,g:tc.axis!==null&&!!tc.object}});
+renderer.domElement.addEventListener('pointerup',e=>{
+ if(!down)return;const d=down;down=null;
+ if(d.g||Math.hypot(e.clientX-d.x,e.clientY-d.y)>6)return;
+ const r=renderer.domElement.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
+ if(edit){pickVert(px,py,e.shiftKey||multi);return}
+ ndc.set(px/r.width*2-1,-(py/r.height)*2+1);ray.setFromCamera(ndc,camera);
+ const hits=ray.intersectObjects([...meshes.values()].filter(m=>m.visible),false);
+ select(hits.length?hits[0].object.userData.id:null);
+});
+
+/* ---------- views ---------- */
+function view(k){
+ const t=orbit.target,d=Math.max(2,camera.position.distanceTo(t)),o={vpersp:[.6,.5,.7],vtop:[0,1,.0001],vfront:[0,0,1],vright:[1,0,0]}[k];
+ const v=new THREE.Vector3(...o).normalize().multiplyScalar(d);camera.position.copy(t).add(v);orbit.update();
+}
+function focus(){
+ const o=cur();const m=o&&meshes.get(o.id);
+ const b=new THREE.Box3();if(m&&m.visible)b.setFromObject(m);else root.children.forEach(c=>c.visible&&b.expandByObject(c));
+ if(b.isEmpty()){orbit.target.set(0,0,0);return}
+ const c=b.getCenter(new THREE.Vector3()),s=b.getSize(new THREE.Vector3()).length()||1;
+ const dir=camera.position.clone().sub(orbit.target).normalize();
+ orbit.target.copy(c);camera.position.copy(c).add(dir.multiplyScalar(s*1.6+.5));orbit.update();
+}
+
+/* ---------- UI: outliner ---------- */
+function renderList(){
+ const q=$('#q').value.trim().toLowerCase();
+ const list=objs.filter(o=>o.name.toLowerCase().includes(q));
+ $('#list').innerHTML=list.map(o=>`<li data-id="${o.id}" class="${o.id===sel?'on':''} ${o.vis?'':'hid'}"><span class="nm" title="Double-click to rename">${esc(o.name)}</span><button class="ib" data-a="vis" aria-label="Hide or show">${o.vis?ICON.eye:ICON.eyeOff}</button><button class="ib" data-a="lock" aria-label="Lock">${o.lock?ICON.lock:ICON.unlock}</button></li>`).join('')
+  ||`<li class="empty">${objs.length?'No matches.':'No objects yet. Add a shape from the toolbar.'}</li>`;
+ stats();
+}
+$('#q').addEventListener('input',renderList);
+$('#list').addEventListener('click',e=>{
+ const li=e.target.closest('li[data-id]');if(!li)return;const id=+li.dataset.id;const a=e.target.closest('[data-a]');
+ if(a){a.dataset.a==='vis'?toggleVis(id):toggleLock(id);return}
+ if(edit&&id!==sel)exitEdit(true);select(id);
+});
+$('#list').addEventListener('dblclick',e=>{
+ const nm=e.target.closest('.nm');if(!nm)return;const id=+nm.parentNode.dataset.id,o=objs.find(x=>x.id===id);
+ const inp=document.createElement('input');inp.value=o.name;nm.replaceWith(inp);inp.focus();inp.select();
+ let done=false;const fin=ok=>{if(done)return;done=true;if(ok&&inp.value.trim())rename(o,inp.value);else renderList()};
+ inp.addEventListener('keydown',k=>{if(k.key==='Enter')fin(true);if(k.key==='Escape')fin(false)});
+ inp.addEventListener('blur',()=>fin(true));
+});
+function rename(o,n){o.name=uniqueName(n,o.id);renderList();renderProps();commit()}
+
+/* ---------- UI: properties ---------- */
+const tri=(lbl,key,arr,st)=>`<div class="f3"><span>${lbl}</span>${arr.map((v,i)=>`<input type="number" step="${st}" data-t="${key}${i}" value="${r4(v)}" aria-label="${lbl} ${'XYZ'[i]}">`).join('')}</div>`;
+function renderProps(){
+ const P=$('#props'),o=cur();
+ if(!o){P.innerHTML=`<h3>Inspector</h3><p class="mut">Click an object in the viewport or outliner to name it, move it, recolour it and reshape it. Add new shapes from the toolbar.</p><p class="mut">Drag to orbit, right-drag or two-finger drag to pan, scroll or pinch to zoom.</p>`;return}
+ if(edit){
+  P.innerHTML=`<h3>Vertex edit</h3><p><b>${esc(o.name)}</b></p><p class="mut" id="vcount"></p>
+  <label class="chk"><input type="checkbox" id="multi" ${multi?'checked':''}> Add to selection on each tap</label>
+  <div class="tools"><button class="b" data-cmd="vall">Select all</button><button class="b" data-cmd="vnone">Deselect</button><button class="b" data-cmd="vcollapse">Collapse</button><button class="b" data-cmd="del">Delete</button></div>
+  <h3 class="s">Mesh tools</h3>
+  <label class="f"><span>Noise amount</span><input type="number" id="noiseAmt" step="0.01" value="0.05"></label>
+  <div class="tools"><button class="b" data-cmd="noise">Add noise</button><button class="b" data-cmd="flip">Flip normals</button><button class="b pri" data-cmd="edit">Done</button></div>
+  <p class="mut">Click points to pick them (Shift adds), then drag with Move, Rotate or Scale. Points show through the mesh so you can reach the back.</p>`;
+  updVcount();return;
+ }
+ const g=meshes.get(o.id).geometry;
+ const vc=g.attributes.position.count,tc_=(g.index?g.index.count:vc)/3;
+ const shape=o.custom?`<p class="mut">Editable mesh · ${vc} vertices · ${Math.round(tc_)} triangles</p>`
+  :Object.keys(o.params).map(k=>`<label class="f"><span>${LBL[k]||k}</span><input type="number" step="${k in IMIN?1:0.05}" data-k="${k}" value="${o.params[k]}"></label>`).join('')+`<div class="tools"><button class="b" data-cmd="convert">Make editable</button></div>`;
+ P.innerHTML=`<h3>Object</h3>
+ <label class="f"><span>Name</span><input id="pName" value="${esc(o.name)}"></label>
+ ${tri('Position','pos',o.pos,0.1)}${tri('Rotation°','rot',o.rot,5)}${tri('Scale','scl',o.scl,0.1)}
+ <h3 class="s">Material</h3>
+ <label class="f"><span>Colour</span><input type="color" id="pCol" value="${o.color}"></label>
+ <label class="f"><span>Roughness</span><input type="range" id="pRough" min="0" max="1" step="0.01" value="${o.rough}"></label>
+ <label class="f"><span>Metalness</span><input type="range" id="pMetal" min="0" max="1" step="0.01" value="${o.metal}"></label>
+ <label class="chk"><input type="checkbox" id="pSmooth" ${o.smooth?'checked':''}> Smooth shading</label>
+ <label class="chk"><input type="checkbox" id="pWire" ${o.wire?'checked':''}> Wireframe</label>
+ <h3 class="s">Shape · ${o.custom?'Mesh':esc(PRIM[o.type].n)}</h3>${shape}
+ <h3 class="s">Tools</h3>
+ <div class="tools"><button class="b" data-cmd="edit">Edit vertices</button><button class="b" data-cmd="floor">Drop to floor</button><button class="b" data-cmd="reset">Reset transform</button><button class="b" data-cmd="apply">Apply transform</button></div>
+ <div class="tools"><button class="b" data-cmd="mx">Mirror X</button><button class="b" data-cmd="my">Mirror Y</button><button class="b" data-cmd="mz">Mirror Z</button></div>
+ <label class="f"><span>Noise amount</span><input type="number" id="noiseAmt" step="0.01" value="0.05"></label>
+ <div class="tools"><button class="b" data-cmd="noise">Add noise</button><button class="b" data-cmd="flip">Flip normals</button><button class="b" data-cmd="dup">Duplicate</button><button class="b" data-cmd="del">Delete</button></div>`;
+}
+function fillT(o){for(const i of document.querySelectorAll('[data-t]')){if(i===document.activeElement)continue;const k=i.dataset.t;i.value=r4(o[k.slice(0,3)][+k[3]])}}
+const RP=$('#right');
+RP.addEventListener('input',e=>{
+ const t=e.target,o=cur();
+ if(t.id==='multi'){multi=t.checked;return}
+ if(!o)return;
+ if(t.dataset.t){const v=parseFloat(t.value);if(!isFinite(v))return;o[t.dataset.t.slice(0,3)][+t.dataset.t[3]]=v;applyT(o,meshes.get(o.id));return}
+ if(t.id==='pCol'){o.color=t.value;updMat(o)}
+ else if(t.id==='pRough'){o.rough=+t.value;updMat(o)}
+ else if(t.id==='pMetal'){o.metal=+t.value;updMat(o)}
+});
+RP.addEventListener('change',e=>{
+ const t=e.target,o=cur();if(!o||t.id==='multi'||t.id==='noiseAmt')return;
+ if(t.id==='pName'){rename(o,t.value);return}
+ if(t.id==='pSmooth'){o.smooth=t.checked;updMat(o)}
+ else if(t.id==='pWire'){o.wire=t.checked;updMat(o)}
+ else if(t.dataset.k){
+  const k=t.dataset.k;let v=parseFloat(t.value);if(!isFinite(v))return renderProps();
+  if(k in IMIN)v=Math.min(k==='detail'?5:256,Math.max(IMIN[k],Math.round(v)));else v=Math.max(0.001,v);
+  o.params[k]=v;replaceGeo(o);renderProps();
+ }
+ commit();
+});
+
+/* ---------- toolbar / commands ---------- */
+function setMode(m){mode=m;tc.setMode(m);btns();hint()}
+function btns(){
+ const on={move:mode==='translate',rotate:mode==='rotate',scale:mode==='scale',edit,snap:snapOn,space:local,grid:grid.visible,wireall:wireAll};
+ for(const b of document.querySelectorAll('header [data-cmd]'))if(b.dataset.cmd in on)b.classList.toggle('on',on[b.dataset.cmd]);
+}
+function hint(){
+ const o=cur();
+ $('#hint').textContent=edit?`Vertex edit · ${ed.o.name} · ${({translate:'Move',rotate:'Rotate',scale:'Scale'})[mode]}`:(o?`${o.name} · ${({translate:'Move',rotate:'Rotate',scale:'Scale'})[mode]}${o.lock?' · locked':''}`:'Object mode · click a shape to select');
+}
+const CMD={
+ move:()=>setMode('translate'),rotate:()=>setMode('rotate'),scale:()=>setMode('scale'),edit:toggleEdit,
+ snap:()=>{snapOn=!snapOn;tc.setTranslationSnap(snapOn?.25:null);tc.setRotationSnap(snapOn?15*D2R:null);tc.setScaleSnap(snapOn?.1:null);btns();toast(snapOn?'Snap on: 0.25 units, 15°, 0.1 scale':'Snap off')},
+ space:()=>{local=!local;tc.setSpace(local?'local':'world');btns()},
+ undo:doUndo,redo:doRedo,dup,del,
+ vpersp:()=>view('vpersp'),vtop:()=>view('vtop'),vfront:()=>view('vfront'),vright:()=>view('vright'),focus,
+ grid:()=>{grid.visible=!grid.visible;axes.visible=grid.visible;btns()},
+ wireall:()=>{wireAll=!wireAll;objs.forEach(updMat);btns()},
+ mx:()=>mirror(0),my:()=>mirror(1),mz:()=>mirror(2),floor,reset:resetT,apply:applyTransform,noise,flip:flipNormals,convert,
+ vall:selAllVerts,vnone:()=>{if(ed){ed.s.clear();vertGizmo()}},vcollapse:collapse,
+ export:openExport,close:()=>{$('#modal').hidden=true},
+ dlobj:()=>{const n=fname();saveFile(n+'.obj',buildOBJ())},
+ dlmtl:()=>{saveFile(fname()+'.mtl',buildMTL())},
+ cpobj:()=>copy(buildOBJ()),
+ import:()=>$('#fImp').click(),open:()=>$('#fOpen').click(),
+ save:()=>saveFile('nugget-model-project.json',JSON.stringify({app:'nugget-modeler',v:1,objs,nid})),
+ new:()=>{if(edit)exitEdit(true);objs=[];rebuildAll();select(null);commit();toast('New scene (Ctrl+Z brings the old one back)')}
+};
+document.addEventListener('click',e=>{
+ const a=e.target.closest('[data-add]');if(a){addPrim(a.dataset.add);return}
+ const c=e.target.closest('[data-cmd]');if(c&&CMD[c.dataset.cmd])CMD[c.dataset.cmd]();
+});
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')$('#modal').hidden=true});
+
+addEventListener('keydown',e=>{
+ if(e.target.closest&&e.target.closest('input,textarea,select'))return;
+ const k=e.key.toLowerCase(),c=e.ctrlKey||e.metaKey;
+ if(c&&k==='z'){e.preventDefault();e.shiftKey?doRedo():doUndo();return}
+ if(c&&k==='y'){e.preventDefault();doRedo();return}
+ if(c&&k==='d'){e.preventDefault();dup();return}
+ if(c&&k==='s'){e.preventDefault();CMD.save();return}
+ if(c||e.altKey)return;
+ const map={w:CMD.move,e:CMD.rotate,r:CMD.scale,f:focus,h:()=>toggleVis(),delete:del,backspace:del,x:del,a:selAllVerts,g:CMD.grid};
+ if(k==='tab'){e.preventDefault();toggleEdit();return}
+ if(k==='escape'){if(!$('#modal').hidden)$('#modal').hidden=true;else if(edit)exitEdit();else select(null);return}
+ if(map[k]){e.preventDefault();map[k]()}
+});
+
+/* ---------- export ---------- */
+const safe=n=>String(n).trim().replace(/\s+/g,'_').replace(/[^\w.\-]/g,'')||'object';
+const fname=()=>safe($('#fname').value)||'model';
+const f5=n=>+n.toFixed(5);
+function exportList(){
+ const scope=document.querySelector('input[name=scope]:checked').value;
+ if(scope==='sel'){const o=cur();return o?[o]:[]}
+ return objs.filter(o=>o.vis);
+}
+function buildOBJ(){
+ const list=exportList(),mtl=$('#wmtl').checked,L=['# Nugget Modeler OBJ export','# objects: '+list.length];
+ if(mtl)L.push('mtllib '+fname()+'.mtl');
+ let vo=0,no=0;const v=new THREE.Vector3(),nm=new THREE.Matrix3();
+ for(const o of list){
+  const m=meshes.get(o.id);m.updateMatrixWorld(true);
+  const g=m.geometry,pa=g.attributes.position;let na=g.attributes.normal;
+  if(!na){g.computeVertexNormals();na=g.attributes.normal}
+  nm.getNormalMatrix(m.matrixWorld);
+  L.push('o '+safe(o.name));if(mtl)L.push('usemtl mat_'+safe(o.name));
+  for(let i=0;i<pa.count;i++){v.fromBufferAttribute(pa,i).applyMatrix4(m.matrixWorld);L.push(`v ${f5(v.x)} ${f5(v.y)} ${f5(v.z)}`)}
+  const useN=o.smooth;
+  if(useN)for(let i=0;i<na.count;i++){v.fromBufferAttribute(na,i).applyMatrix3(nm).normalize();L.push(`vn ${f5(v.x)} ${f5(v.y)} ${f5(v.z)}`)}
+  L.push('s '+(o.smooth?1:'off'));
+  const idx=g.index?g.index.array:null,n=idx?idx.length:pa.count,flip=m.matrixWorld.determinant()<0;
+  for(let t=0;t+2<n;t+=3){
+   let a=idx?idx[t]:t,b=idx?idx[t+1]:t+1,c=idx?idx[t+2]:t+2;if(flip){const x=b;b=c;c=x}
+   L.push(useN?`f ${a+vo+1}//${a+no+1} ${b+vo+1}//${b+no+1} ${c+vo+1}//${c+no+1}`:`f ${a+vo+1} ${b+vo+1} ${c+vo+1}`);
+  }
+  vo+=pa.count;if(useN)no+=na.count;
+ }
+ return L.join('\n')+'\n';
+}
+function buildMTL(){
+ const c=new THREE.Color();
+ return '# Nugget Modeler materials\n'+exportList().map(o=>{c.set(o.color);const s=(.04+o.metal*.6).toFixed(3);return `newmtl mat_${safe(o.name)}\nKa 0 0 0\nKd ${c.r.toFixed(4)} ${c.g.toFixed(4)} ${c.b.toFixed(4)}\nKs ${s} ${s} ${s}\nNs ${Math.round((1-o.rough)*200+10)}\nd 1\nillum 2\n`}).join('\n');
+}
+function openExport(){
+ if(edit)exitEdit();
+ if(!objs.length)return toast('Add something to export first');
+ if(!cur())document.querySelector('input[name=scope][value=all]').checked=true;
+ $('#modal').hidden=false;refreshExport();
+}
+function refreshExport(){
+ const list=exportList();let V=0,F=0;
+ for(const o of list){const g=meshes.get(o.id).geometry;V+=g.attributes.position.count;F+=(g.index?g.index.count:g.attributes.position.count)/3}
+ $('#estats').textContent=list.length?`${list.length} object${list.length>1?'s':''} · ${V} vertices · ${Math.round(F)} triangles. Names become OBJ object names (spaces turn into _).`:'Nothing selected. Pick "All visible objects" or select an object.';
+ const t=list.length?buildOBJ():'';$('#eout').value=t.length>30000?t.slice(0,30000)+'\n# … preview cut here, the file has everything':t;
+}
+$('#modal').addEventListener('change',refreshExport);
+
+let dl=null;
+try{const u=window.claude&&window.claude.use&&window.claude.use('downloads');if(u&&u.then)u.then(x=>{dl=x}).catch(()=>{})}catch(e){}
+async function saveFile(name,text){
+ if(dl){try{await dl.save({filename:name,data:text});toast('Saved '+name)}catch(e){toast('Download was cancelled or blocked. Use Copy instead.')}return}
+ try{
+  const url=URL.createObjectURL(new Blob([text],{type:'text/plain'})),a=document.createElement('a');
+  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);toast('Downloading '+name);
+ }catch(e){toast('Downloads are blocked here. Use Copy OBJ text.')}
+}
+function copy(text){
+ const ta=$('#eout');
+ navigator.clipboard.writeText(text).then(()=>toast('OBJ copied to clipboard')).catch(()=>{ta.value=text;ta.focus();ta.select();toast('Press Ctrl+C to copy')});
+}
+
+/* ---------- import / open ---------- */
+$('#fImp').addEventListener('change',async e=>{
+ const f=e.target.files[0];e.target.value='';if(!f)return;
+ try{importOBJ(await f.text(),f.name)}catch(err){toast('Could not read that OBJ file')}
+});
+$('#fOpen').addEventListener('change',async e=>{
+ const f=e.target.files[0];e.target.value='';if(!f)return;
+ try{const d=JSON.parse(await f.text());if(!Array.isArray(d.objs))throw 0;if(edit)exitEdit(true);objs=d.objs;nid=d.nid||objs.reduce((a,o)=>Math.max(a,o.id+1),1);rebuildAll();select(null);commit();focus();toast('Opened '+f.name)}
+ catch(err){toast('That file is not a Nugget Modeler project')}
+});
+function importOBJ(text,fn){
+ if(edit)exitEdit();
+ const V=[],groups=[];let name=fn.replace(/\.obj$/i,''),faces=[];
+ const flush=()=>{if(faces.length)groups.push({name,faces});faces=[]};
+ for(const line of text.split(/\r?\n/)){
+  const t=line.trim().split(/\s+/),k=t[0];
+  if(k==='v')V.push([+t[1]||0,+t[2]||0,+t[3]||0]);
+  else if(k==='o'||k==='g'){flush();if(t.length>1)name=t.slice(1).join(' ')}
+  else if(k==='f'){
+   const ids=t.slice(1).map(x=>{const n=parseInt(x.split('/')[0],10);return n<0?V.length+n:n-1}).filter(n=>n>=0);
+   for(let i=1;i+1<ids.length;i++)faces.push(ids[0],ids[i],ids[i+1]);
+  }
+ }
+ flush();
+ if(!groups.length)return toast('No faces found in that OBJ');
+ let lastId=null;
+ for(const g of groups){
+  const map=new Map(),p=[],idx=[];
+  for(const vi of g.faces){let n=map.get(vi);if(n===undefined){n=map.size;map.set(vi,n);const q=V[vi]||[0,0,0];p.push(q[0],q[1],q[2])}idx.push(n)}
+  const o=newObj('custom',g.name);o.custom={p,i:idx};objs.push(o);const m=makeMesh(o);root.add(m);meshes.set(o.id,m);lastId=o.id;
+ }
+ select(lastId);commit();focus();toast(`Imported ${groups.length} object${groups.length>1?'s':''}`);
+}
+
+/* ---------- status ---------- */
+let tt=0;
+function toast(s){$('#msg').textContent=s;clearTimeout(tt);tt=setTimeout(()=>$('#msg').textContent='',2600)}
+function stats(){
+ let v=0;for(const m of meshes.values())v+=m.geometry.attributes.position.count;
+ $('#stat').textContent=`${objs.length} object${objs.length===1?'':'s'} · ${v} vertices · autosaved in this browser`;
+ const c=$('#count');if(c)c.textContent='';
+}
+
+/* ---------- boot ---------- */
+function seed(){
+ const a=newObj('box','Crate');a.pos=[0,.5,0];a.color='#c98b4f';a.smooth=false;
+ const b=newObj('sphere','Ball');b.pos=[0,1.6,0];b.color='#4f86c6';
+ const c=newObj('cone','Spike');c.pos=[1.6,.5,0];c.color='#e4572e';
+ objs=[a,b,c];
+}
+let saved=null;try{saved=localStorage.getItem(KEY)}catch(e){}
+if(saved){try{const d=JSON.parse(saved);if(!Array.isArray(d.objs))throw 0;objs=d.objs;nid=d.nid}catch(e){seed()}}else seed();
+rebuildAll();last=snap();select(null);btns();
+
+function resize(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+const ro=new ResizeObserver(resize);ro.observe(vp);resize();
+(function loop(){requestAnimationFrame(loop);orbit.update();if(helper)helper.update();renderer.render(scene,camera)})();
+}
+</script>
+</body>
+</html>

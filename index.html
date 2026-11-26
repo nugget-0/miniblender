@@ -314,7 +314,7 @@ function select(id){
  if(pivMode&&!(m&&o.vis&&!o.lock)){pivMode=false;btns()}
  if(!edit){
   if(pivMode){m.updateMatrixWorld(true);pivDummy.position.copy(m.position);pivDummy.quaternion.copy(m.quaternion);tc.setMode('translate');tc.attach(pivDummy)}
-  else if(m&&o.vis&&!o.lock){tc.setMode(mode);tc.attach(m)}else tc.detach();
+  else if(m&&o.vis&&!o.lock&&mode!=='scale'){tc.setMode(mode);tc.attach(m)}else tc.detach();
   if(m&&o.vis){helper=new THREE.BoxHelper(m,0xe4572e);scene.add(helper)}
  }
  renderList();renderProps();hint();
@@ -488,6 +488,58 @@ renderer.domElement.addEventListener('pointerup',e=>{
  select(hits.length?hits[0].object.userData.id:null);
 });
 
+/* ---------- Roblox-style side scale handles (Scale mode) ---------- */
+const sh=new THREE.Group();sh.visible=false;scene.add(sh);
+const SH=[];
+[[0,1,0xe5484d],[0,-1,0xe5484d],[1,1,0x46a758],[1,-1,0x46a758],[2,1,0x3e7bd6],[2,-1,0x3e7bd6]].forEach(([a,s,c])=>{
+ const h=new THREE.Mesh(new THREE.SphereGeometry(1,16,12),new THREE.MeshBasicMaterial({color:c,depthTest:false}));
+ h.renderOrder=8;h.userData={a,s,dir:new THREE.Vector3()};sh.add(h);SH.push(h);
+});
+const shActive=()=>{const o=cur(),m=o&&meshes.get(o.id);return !!(m&&mode==='scale'&&!edit&&!pivMode&&o.vis&&!o.lock)};
+function faceLocal(g,a,s){const b=g.boundingBox,c=b.getCenter(new THREE.Vector3());c.setComponent(a,s>0?b.max.getComponent(a):b.min.getComponent(a));return c}
+function updHandles(){
+ sh.visible=shActive();if(!sh.visible)return;
+ const m=meshes.get(sel),g=m.geometry;if(!g.boundingBox)g.computeBoundingBox();
+ m.updateMatrixWorld(true);
+ const cw=g.boundingBox.getCenter(new THREE.Vector3()).applyMatrix4(m.matrixWorld);
+ for(const h of SH){
+  const {a,s}=h.userData,fw=faceLocal(g,a,s).applyMatrix4(m.matrixWorld);
+  const dir=fw.clone().sub(cw);
+  if(dir.lengthSq()<1e-10)dir.set(0,0,0).setComponent(a,s).applyQuaternion(m.quaternion);
+  dir.normalize();h.userData.dir.copy(dir);
+  const k=camera.position.distanceTo(fw)*(matchMedia('(pointer:coarse)').matches?.03:.02);
+  h.position.copy(fw).addScaledVector(dir,k*2.2);h.scale.setScalar(k);
+ }
+}
+let sdrag=null;
+function rayAt(e){const r=renderer.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(ndc,camera)}
+// capture phase on the viewport so a handle grab never reaches orbit/selection
+vp.addEventListener('pointerdown',e=>{
+ if(!sh.visible||e.button>0)return;
+ rayAt(e);const hit=ray.intersectObjects(SH,false)[0];if(!hit)return;
+ e.stopPropagation();e.preventDefault();
+ const o=cur(),m=meshes.get(o.id),{a,s}=hit.object.userData,d=hit.object.userData.dir.clone();
+ const view=camera.getWorldDirection(new THREE.Vector3());
+ let n=d.clone().cross(view).cross(d);if(n.lengthSq()<1e-8)n=view.clone().negate();n.normalize();
+ const p0=hit.object.position.clone(),b=m.geometry.boundingBox.clone();
+ sdrag={o,m,a,s,d,p0,b,plane:new THREE.Plane().setFromNormalAndCoplanarPoint(n,p0),scl0:m.scale.clone(),pos0:m.position.clone(),L:b.max.getComponent(a)-b.min.getComponent(a)};
+ orbit.enabled=false;
+},true);
+addEventListener('pointermove',e=>{
+ if(!sdrag)return;
+ rayAt(e);const X=ray.ray.intersectPlane(sdrag.plane,new THREE.Vector3());if(!X)return;
+ const D=sdrag,t=X.sub(D.p0).dot(D.d),sym=e.shiftKey||e.ctrlKey||e.metaKey;
+ const s0=D.scl0.getComponent(D.a),L0=D.L*Math.abs(s0);if(L0<1e-6)return;
+ let L1=L0+(sym?2*t:t);if(snapOn)L1=Math.round(L1/.25)*.25;L1=Math.max(.01,L1);
+ const s1=s0*L1/L0;
+ // the opposite side (or the middle, when symmetric) stays fixed in the world
+ const lo=D.b.min.getComponent(D.a),hi=D.b.max.getComponent(D.a),c=sym?(lo+hi)/2:(D.s>0?lo:hi);
+ const off=new THREE.Vector3().setComponent(D.a,(s0-s1)*c).applyQuaternion(D.m.quaternion);
+ D.m.scale.copy(D.scl0).setComponent(D.a,s1);D.m.position.copy(D.pos0).add(off);
+ syncFromMesh(D.o);fillT(D.o);
+});
+addEventListener('pointerup',()=>{if(!sdrag)return;sdrag=null;orbit.enabled=true;commit();renderProps()});
+
 /* ---------- views ---------- */
 function view(k){
  const t=orbit.target,d=Math.max(2,camera.position.distanceTo(t)),o={vpersp:[.6,.5,.7],vtop:[0,1,.0001],vfront:[0,0,1],vright:[1,0,0]}[k];
@@ -588,7 +640,7 @@ RP.addEventListener('change',e=>{
 });
 
 /* ---------- toolbar / commands ---------- */
-function setMode(m){if(pivMode){pivMode=false;select(sel)}mode=m;tc.setMode(m);btns();hint()}
+function setMode(m){pivMode=false;mode=m;tc.setMode(m);if(!edit)select(sel);btns();hint()}
 function btns(){
  const on={move:mode==='translate'&&!pivMode,rotate:mode==='rotate'&&!pivMode,scale:mode==='scale'&&!pivMode,edit,pivot:pivMode,snap:snapOn,space:local,grid:grid.visible,wireall:wireAll};
  for(const b of document.querySelectorAll('header [data-cmd]'))if(b.dataset.cmd in on)b.classList.toggle('on',on[b.dataset.cmd]);
@@ -596,7 +648,7 @@ function btns(){
 function hint(){
  const o=cur();
  if(pivMode&&o){$('#hint').textContent=`${o.name} · Pivot mode: drag to place the pivot`;return}
- $('#hint').textContent=edit?`Vertex edit · ${ed.o.name} · ${({translate:'Move',rotate:'Rotate',scale:'Scale'})[mode]}`:(o?`${o.name} · ${({translate:'Move',rotate:'Rotate',scale:'Scale'})[mode]}${o.lock?' · locked':''}`:'Object mode · click a shape to select');
+ $('#hint').textContent=edit?`Vertex edit · ${ed.o.name} · ${({translate:'Move',rotate:'Rotate',scale:'Scale'})[mode]}`:(o?`${o.name} · ${({translate:'Move',rotate:'Rotate',scale:'Scale'})[mode]}${o.lock?' · locked':mode==='scale'?' · drag a dot to stretch that side (Shift = both sides)':''}`:'Object mode · click a shape to select');
 }
 const CMD={
  pivot:togglePivot,ocenter:()=>originTo('center'),obottom:()=>originTo('bottom'),otop:()=>originTo('top'),oworld:()=>originTo('world'),overts:()=>originTo('verts'),
@@ -792,7 +844,7 @@ rebuildAll();last=snap();select(null);btns();
 
 function resize(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
 const ro=new ResizeObserver(resize);ro.observe(vp);resize();
-(function loop(){requestAnimationFrame(loop);orbit.update();if(helper)helper.update();
+(function loop(){requestAnimationFrame(loop);orbit.update();if(helper)helper.update();updHandles();
  {const o=cur(),m=o&&meshes.get(o.id);pivMark.visible=!!(m&&m.visible);
   if(pivMark.visible){if(pivMode&&tc.object===pivDummy)pivMark.position.copy(pivDummy.position);else pivMark.position.copy(m.position);pivMark.quaternion.copy(m.quaternion)}}
  renderer.render(scene,camera)})();

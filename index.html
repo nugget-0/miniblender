@@ -125,7 +125,7 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
   <label class="chk"><input type="checkbox" id="pivZero"> Put each object's pivot at 0,0,0 (best when exporting parts one at a time for animation)</label>
   <p class="mut" id="estats"></p>
   <div class="tools">
-   <button class="b pri" data-cmd="dlobj">Download .obj</button><button class="b" data-cmd="dlmtl">Download .mtl</button><button class="b" data-cmd="dlpiv">Download pivots .json</button><button class="b" data-cmd="cppiv">Copy pivots JSON</button><button class="b" data-cmd="cpobj">Copy OBJ text</button><button class="b" data-cmd="close">Close</button>
+   <button class="b pri" data-cmd="dlobj">Download .obj</button><button class="b" data-cmd="dlmtl">Download .mtl</button><button class="b pri" data-cmd="dlpiv">Download model .json</button><button class="b" data-cmd="cppiv">Copy model JSON</button><button class="b" data-cmd="cpobj">Copy OBJ text</button><button class="b" data-cmd="close">Close</button>
   </div>
   <textarea id="eout" readonly aria-label="OBJ preview"></textarea>
  </div>
@@ -612,8 +612,8 @@ const CMD={
  dlobj:()=>{const n=fname();saveFile(n+'.obj',buildOBJ())},
  dlmtl:()=>{saveFile(fname()+'.mtl',buildMTL())},
  cpobj:()=>copy(buildOBJ()),
- dlpiv:()=>saveFile(fname()+'.pivots.json',buildPivots()),
- cppiv:()=>copy(buildPivots(),'Pivots JSON copied'),
+ dlpiv:()=>saveFile(fname()+'.model.json',buildModelJSON()),
+ cppiv:()=>copy(buildModelJSON(),'Model JSON copied'),
  import:()=>$('#fImp').click(),open:()=>$('#fOpen').click(),
  save:()=>saveFile('nugget-model-project.json',JSON.stringify({app:'nugget-modeler',v:1,objs,nid})),
  new:()=>{if(edit)exitEdit(true);objs=[];rebuildAll();select(null);commit();toast('New scene (Ctrl+Z brings the old one back)')}
@@ -698,20 +698,34 @@ async function saveFile(name,text){
   a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),5000);toast('Downloading '+name);
  }catch(e){toast('Downloads are blocked here. Use Copy OBJ text.')}
 }
-/* pivots JSON: one entry per exported object, names match the OBJ "o" lines */
-function buildPivots(){
- const zero=$('#pivZero').checked;
- const out={format:'nugget-pivots',version:1,model:fname()+'.obj',
-  pivotsAtOrigin:zero,
-  note:(zero?'OBJ was exported with each object centred on its pivot: set each mesh position to "pivot".':'OBJ was exported in scene space: put each mesh in a group at "pivot" and set the mesh position to -pivot.')+' Rotation and scale are already baked into the OBJ vertices (listed for reference only). Rotate the mesh/group to animate around the pivot.',
-  objects:exportList().map(o=>{
-   const m=meshes.get(o.id);m.updateMatrixWorld(true);
-   const b=new THREE.Box3().setFromObject(m),q=m.quaternion;
-   return{name:safe(o.name),label:o.name,pivot:o.pos.map(f5),
-    rotation:o.rot.map(f5),rotationRad:o.rot.map(d=>f5(d*D2R)),quaternion:[q.x,q.y,q.z,q.w].map(f5),scale:o.scl.map(f5),
-    bounds:{min:b.min.toArray().map(f5),max:b.max.toArray().map(f5)}};
-  })};
- return JSON.stringify(out,null,2);
+/* whole model as JSON: every part's mesh (vertices relative to its pivot) + pivot, rotation, scale, material.
+   In a game: mesh.position = pivot, mesh.rotation = rotationRad, mesh.scale = scale → rotating it swings around the pivot. */
+function buildModelJSON(){
+ const parts=exportList().map(o=>{
+  const g=meshes.get(o.id).geometry,pa=g.attributes.position.array;
+  const idx=g.index?Array.from(g.index.array):Array.from({length:pa.length/3},(_,i)=>i);
+  return{name:safe(o.name),label:o.name,pivot:o.pos.map(f5),rotation:o.rot.map(f5),rotationRad:o.rot.map(d=>f5(d*D2R)),scale:o.scl.map(f5),
+   material:{color:o.color,roughness:o.rough,metalness:o.metal,smooth:o.smooth},
+   vertexCount:pa.length/3,triangleCount:idx.length/3,
+   positions:Array.from(pa,f5),indices:idx};
+ });
+ const out={format:'nugget-model',version:1,name:fname(),
+  note:'positions are local to each part (pivot = 0,0,0). Place the mesh at pivot with rotationRad and scale; rotate it to animate around the pivot.',
+  parts};
+ // keep it readable but compact: big number arrays stay on one line
+ return JSON.stringify(out,(k,v)=>(k==='positions'||k==='indices')?JSON.stringify(v):v,2).replace(/"(\[[-\d.,e]*\])"/g,'$1');
+}
+function loadModelJSON(d){
+ if(edit)exitEdit(true);
+ let lastId=null;
+ for(const p of d.parts||[]){
+  const o=newObj('custom',p.label||p.name);
+  o.custom={p:p.positions.slice(),i:p.indices?p.indices.slice():null};
+  o.pos=(p.pivot||[0,0,0]).slice();o.rot=(p.rotation||[0,0,0]).slice();o.scl=(p.scale||[1,1,1]).slice();
+  const mt=p.material||{};if(mt.color)o.color=mt.color;if(mt.roughness!=null)o.rough=mt.roughness;if(mt.metalness!=null)o.metal=mt.metalness;if(mt.smooth!=null)o.smooth=mt.smooth;
+  objs.push(o);const m=makeMesh(o);root.add(m);meshes.set(o.id,m);lastId=o.id;
+ }
+ select(lastId);commit();focus();
 }
 function copy(text,msg){
  const ta=$('#eout');
@@ -725,7 +739,9 @@ $('#fImp').addEventListener('change',async e=>{
 });
 $('#fOpen').addEventListener('change',async e=>{
  const f=e.target.files[0];e.target.value='';if(!f)return;
- try{const d=JSON.parse(await f.text());if(!Array.isArray(d.objs))throw 0;if(edit)exitEdit(true);objs=d.objs;nid=d.nid||objs.reduce((a,o)=>Math.max(a,o.id+1),1);rebuildAll();select(null);commit();focus();toast('Opened '+f.name)}
+ try{const d=JSON.parse(await f.text());
+  if(d.format==='nugget-model'&&Array.isArray(d.parts)){loadModelJSON(d);toast('Added model '+f.name);return}
+  if(!Array.isArray(d.objs))throw 0;if(edit)exitEdit(true);objs=d.objs;nid=d.nid||objs.reduce((a,o)=>Math.max(a,o.id+1),1);rebuildAll();select(null);commit();focus();toast('Opened '+f.name)}
  catch(err){toast('That file is not a Nugget Modeler project')}
 });
 function importOBJ(text,fn){

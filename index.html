@@ -48,6 +48,7 @@ input[type=range]{padding:0;border:0;background:none;accent-color:var(--acc)}
 #list li.empty{cursor:default;color:var(--mut);font-size:13px}
 #list li.grp .nm{font-weight:700}
 #list .nm svg{width:14px;height:14px;vertical-align:-2px;margin-right:5px;color:var(--acc)}
+#boxsel{position:absolute;display:none;border:1.5px dashed var(--acc);background:color-mix(in srgb,var(--acc) 14%,transparent);pointer-events:none;z-index:2}
 #list li.drop{outline:2px dashed var(--acc);outline-offset:-2px}
 #list .tw{width:18px;font-size:11px}
 select{font:inherit;color:inherit;background:var(--in);border:1px solid var(--line);border-radius:7px;padding:5px 7px;width:100%}
@@ -89,7 +90,7 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
   <button class="b" data-add="box">Cube</button><button class="b" data-add="sphere">Sphere</button><button class="b" data-add="cyl">Cylinder</button><button class="b" data-add="cone">Cone</button><button class="b" data-add="pyr">Pyramid</button><button class="b" data-add="prism">Prism</button><button class="b" data-add="torus">Torus</button><button class="b" data-add="ico">Icosphere</button><button class="b" data-add="plane">Plane</button><button class="b" data-add="knot">Knot</button>
  </div>
  <div class="grp"><small>Tool</small>
-  <button class="b on" data-cmd="move">Move<kbd>W</kbd></button><button class="b" data-cmd="rotate">Rotate<kbd>E</kbd></button><button class="b" data-cmd="scale">Scale<kbd>R</kbd></button><button class="b" data-cmd="edit">Edit verts<kbd>Tab</kbd></button><button class="b" data-cmd="pivot">Pivot<kbd>P</kbd></button><button class="b" data-cmd="snap">Snap</button><button class="b" data-cmd="space">Local</button>
+  <button class="b on" data-cmd="move">Move<kbd>W</kbd></button><button class="b" data-cmd="rotate">Rotate<kbd>E</kbd></button><button class="b" data-cmd="scale">Scale<kbd>R</kbd></button><button class="b" data-cmd="edit">Edit verts<kbd>Tab</kbd></button><button class="b" data-cmd="pivot">Pivot<kbd>P</kbd></button><button class="b" data-cmd="box">Box<kbd>hold T</kbd></button><button class="b" data-cmd="snap">Snap</button><button class="b" data-cmd="space">Local</button>
  </div>
  <div class="grp"><small>Edit</small>
   <button class="b" data-cmd="undo">Undo</button><button class="b" data-cmd="redo">Redo</button><button class="b" data-cmd="dup">Duplicate</button><button class="b" data-cmd="del">Delete</button><button class="b" data-cmd="group">Group<kbd>Ctrl+G</kbd></button><button class="b" data-cmd="ungroup">Ungroup</button>
@@ -109,7 +110,7 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
  <p class="mut" id="count"></p>
  <h3 class="s">Shortcuts</h3>
  <ul class="keys">
-  <li><b>W E R</b> move / rotate / scale</li><li><b>Tab</b> vertex edit</li><li><b>P</b> pivot mode</li><li><b>Ctrl+D</b> duplicate</li><li><b>Ctrl+G</b> group</li><li><b>Ctrl+Shift+G</b> ungroup</li><li><b>Shift-click</b> multi-select</li><li><b>Del / X</b> delete</li><li><b>Ctrl+Z</b> undo</li><li><b>Ctrl+Y</b> redo</li><li><b>F</b> focus</li><li><b>H</b> hide</li><li><b>A</b> all verts</li><li><b>Esc</b> deselect</li><li><b>Dbl-click</b> rename</li><li><b>Ctrl+S</b> save</li>
+  <li><b>W E R</b> move / rotate / scale</li><li><b>Tab</b> vertex edit</li><li><b>P</b> pivot mode</li><li><b>Ctrl+D</b> duplicate</li><li><b>Ctrl+G</b> group</li><li><b>Ctrl+Shift+G</b> ungroup</li><li><b>Shift-click</b> multi-select</li><li><b>Hold T + drag</b> box select</li><li><b>Del / X</b> delete</li><li><b>Ctrl+Z</b> undo</li><li><b>Ctrl+Y</b> redo</li><li><b>F</b> focus</li><li><b>H</b> hide</li><li><b>A</b> all verts</li><li><b>Esc</b> deselect</li><li><b>Dbl-click</b> rename</li><li><b>Ctrl+S</b> save</li>
  </ul>
 </aside>
 
@@ -620,6 +621,43 @@ addEventListener('pointermove',e=>{
 });
 addEventListener('pointerup',()=>{if(!sdrag)return;sdrag=null;orbit.enabled=true;commit();renderProps()});
 
+/* ---------- box select: hold T (or turn on Box) and drag ---------- */
+let tDown=false,boxMode=false,box=null;
+const boxEl=document.createElement('div');boxEl.id='boxsel';vp.appendChild(boxEl);
+const typing=e=>e.target&&e.target.closest&&e.target.closest('input,textarea,select');
+addEventListener('keydown',e=>{if(e.key.toLowerCase()==='t'&&!typing(e)&&!e.ctrlKey&&!e.metaKey){tDown=true;orbit.enabled=false}});
+addEventListener('keyup',e=>{if(e.key.toLowerCase()==='t'){tDown=false;if(!box&&!sdrag&&!tc.dragging&&!boxMode)orbit.enabled=true}});
+addEventListener('blur',()=>{tDown=false;if(!boxMode)orbit.enabled=true});
+vp.addEventListener('pointerdown',e=>{
+ if(sdrag||!(tDown||boxMode)||e.button>0)return;
+ e.stopPropagation();e.preventDefault();
+ const r=vp.getBoundingClientRect();
+ box={x0:e.clientX-r.left,y0:e.clientY-r.top,x1:e.clientX-r.left,y1:e.clientY-r.top,add:e.shiftKey||e.ctrlKey||e.metaKey};
+ orbit.enabled=false;drawBox();
+},true);
+addEventListener('pointermove',e=>{if(!box)return;const r=vp.getBoundingClientRect();box.x1=e.clientX-r.left;box.y1=e.clientY-r.top;drawBox()});
+addEventListener('pointerup',()=>{
+ if(!box)return;const b=box;box=null;boxEl.style.display='none';
+ if(!tDown&&!boxMode)orbit.enabled=true;
+ const x0=Math.min(b.x0,b.x1),x1=Math.max(b.x0,b.x1),y0=Math.min(b.y0,b.y1),y1=Math.max(b.y0,b.y1);
+ if(x1-x0<4&&y1-y0<4)return;
+ const w=renderer.domElement.clientWidth,h=renderer.domElement.clientHeight,v=new THREE.Vector3();
+ const inBox=p=>{p.project(camera);if(p.z<-1||p.z>1)return false;const sx=(p.x+1)/2*w,sy=(1-p.y)/2*h;return sx>=x0&&sx<=x1&&sy>=y0&&sy<=y1};
+ if(edit&&ed){
+  const ra=ed.pts.geometry.attributes.position;ed.m.updateWorldMatrix(true,true);if(!b.add)ed.s.clear();
+  for(let g=0;g<ed.groups.length;g++)if(inBox(v.fromBufferAttribute(ra,g).applyMatrix4(ed.m.matrixWorld)))ed.s.add(g);
+  vertGizmo();toast(ed.s.size+' vertices picked');return;
+ }
+ const ids=[];
+ for(const [id,m] of meshes){const o=byId(id);if(!effVis(o))continue;m.updateWorldMatrix(true,false);if(inBox(new THREE.Box3().setFromObject(m).getCenter(v)))ids.push(id)}
+ if(!ids.length){if(!b.add)select(null);return toast('Nothing inside the box')}
+ if(!b.add)msel=new Set();ids.forEach(id=>msel.add(id));
+ sel=ids[ids.length-1];select(sel);toast(`${msel.size} selected`);
+});
+function drawBox(){const s=boxEl.style;s.display='block';s.left=Math.min(box.x0,box.x1)+'px';s.top=Math.min(box.y0,box.y1)+'px';s.width=Math.abs(box.x1-box.x0)+'px';s.height=Math.abs(box.y1-box.y0)+'px'}
+/* every part in the selection, with groups opened up into their parts */
+function selParts(){const out=new Map();for(const id of msel){const o=byId(id);if(!o)continue;(isG(o)?descOf(id):[o]).forEach(k=>{if(!isG(k))out.set(k.id,k)})}return[...out.values()]}
+
 /* ---------- views ---------- */
 function view(k){
  const t=orbit.target,d=Math.max(2,camera.position.distanceTo(t)),o={vpersp:[.6,.5,.7],vtop:[0,1,.0001],vfront:[0,0,1],vright:[1,0,0]}[k];
@@ -697,6 +735,7 @@ function renderProps(){
  if(msel.size>1){
   P.innerHTML=`<h3>${msel.size} selected</h3><p class="mut">Group them to move them together, or to keep them labelled as one thing.</p>
   <div class="tools"><button class="b pri" data-cmd="group">Group (Ctrl+G)</button><button class="b" data-cmd="del">Delete all</button><button class="b" data-cmd="desel">Deselect</button></div>
+  <label class="f"><span>Colour all</span><input type="color" id="mCol" value="${(selParts()[0]||{}).color||'#ffffff'}"></label>
   <label class="f"><span>Move into</span>${parentSel(o,[...msel])}</label>
   <p class="mut">Shift or Ctrl-click to add or remove items.</p>`;return;
  }
@@ -705,6 +744,7 @@ function renderProps(){
   P.innerHTML=`<h3>Group</h3>
   <label class="f"><span>Name</span><input id="pName" value="${esc(o.name)}"></label>
   <label class="f"><span>In group</span>${parentSel(o,[o.id])}</label>
+  <label class="f"><span>Colour all</span><input type="color" id="mCol" value="${(selParts()[0]||{}).color||'#ffffff'}"></label>
   ${tri('Position','pos',o.pos,0.1)}${tri('Rotation°','rot',o.rot,5)}${tri('Scale','scl',o.scl,0.1)}
   <p class="mut">${kidsOf(o.id).length} item${kidsOf(o.id).length===1?'':'s'} inside (${parts} part${parts===1?'':'s'}). Moving the group moves all of it. In the viewport, click again on a part to pick just that part.</p>
   <h3 class="s">Pivot</h3>
@@ -743,6 +783,7 @@ RP.addEventListener('input',e=>{
  const t=e.target,o=cur();
  if(t.id==='multi'){multi=t.checked;return}
  if(!o)return;
+ if(t.id==='mCol'){selParts().forEach(p=>{p.color=t.value;updMat(p)});return}
  if(t.dataset.t){const v=parseFloat(t.value);if(!isFinite(v))return;o[t.dataset.t.slice(0,3)][+t.dataset.t[3]]=v;applyT(o,N(o.id));return}
  if(t.id==='pCol'){o.color=t.value;updMat(o)}
  else if(t.id==='pRough'){o.rough=+t.value;updMat(o)}
@@ -765,7 +806,7 @@ RP.addEventListener('change',e=>{
 /* ---------- toolbar / commands ---------- */
 function setMode(m){pivMode=false;mode=m;tc.setMode(m);if(!edit)select(sel);btns();hint()}
 function btns(){
- const on={move:mode==='translate'&&!pivMode,rotate:mode==='rotate'&&!pivMode,scale:mode==='scale'&&!pivMode,edit,pivot:pivMode,snap:snapOn,space:local,grid:grid.visible,wireall:wireAll};
+ const on={move:mode==='translate'&&!pivMode,rotate:mode==='rotate'&&!pivMode,scale:mode==='scale'&&!pivMode,edit,pivot:pivMode,box:boxMode,snap:snapOn,space:local,grid:grid.visible,wireall:wireAll};
  for(const b of document.querySelectorAll('header [data-cmd]'))if(b.dataset.cmd in on)b.classList.toggle('on',on[b.dataset.cmd]);
 }
 function hint(){
@@ -784,6 +825,7 @@ const CMD={
  grid:()=>{grid.visible=!grid.visible;axes.visible=grid.visible;btns()},
  wireall:()=>{wireAll=!wireAll;objs.forEach(updMat);btns()},
  mx:()=>mirror(0),my:()=>mirror(1),mz:()=>mirror(2),floor,reset:resetT,apply:meshOnly(applyTransform),noise:meshOnly(noise),flip:meshOnly(flipNormals),convert:meshOnly(convert),
+ box:()=>{boxMode=!boxMode;orbit.enabled=!boxMode;btns();toast(boxMode?'Box select on: drag to select (Shift adds). Turn it off to orbit again.':'Box select off')},
  group:groupSel,ungroup,selkids:selKids,desel:()=>select(null),
  vall:selAllVerts,vnone:()=>{if(ed){ed.s.clear();vertGizmo()}},vcollapse:collapse,
  export:openExport,close:()=>{$('#modal').hidden=true},
@@ -987,7 +1029,7 @@ rebuildAll();last=snap();select(null);btns();
 
 function resize(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
 const ro=new ResizeObserver(resize);ro.observe(vp);resize();
-(function loop(){requestAnimationFrame(loop);orbit.update();if(helper)helper.update();updHandles();
+(function loop(){requestAnimationFrame(loop);if((boxMode||tDown||box)&&!tc.dragging)orbit.enabled=false;orbit.update();if(helper)helper.update();updHandles();
  xhelp.forEach(h=>h.update());
  {const o=cur(),m=o&&N(o.id);pivMark.visible=!!(m&&effVis(o));
   if(pivMark.visible){if(pivMode&&tc.object===pivDummy)pivMark.position.copy(pivDummy.position);else m.getWorldPosition(pivMark.position);m.getWorldQuaternion(pivMark.quaternion)}}

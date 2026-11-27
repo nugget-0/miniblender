@@ -207,7 +207,7 @@ function uniqueName(base,selfId){
 }
 function newObj(type,name){
  const P=PRIM[type];
- return{id:nid++,name:uniqueName(name||(P?P.n:'Mesh')),type,params:P?{...P.p}:{},color:PAL[(nid-2)%PAL.length],rough:.55,metal:0,smooth:SMOOTH.has(type),wire:false,vis:true,lock:false,pos:[0,0,0],rot:[0,0,0],scl:[1,1,1],custom:null};
+ return{id:nid++,name:uniqueName(name||(P?P.n:'Mesh')),type,params:P?{...P.p}:{},color:'#ffffff',rough:.55,metal:0,smooth:SMOOTH.has(type),wire:false,vis:true,lock:false,pos:[0,0,0],rot:[0,0,0],scl:[1,1,1],custom:null};
 }
 function buildGeo(o){
  if(o.custom){

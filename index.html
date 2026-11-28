@@ -351,12 +351,13 @@ function syncFromMesh(o){
  o.scl=m.scale.toArray().map(r4);
 }
 function makeMesh(o){
- const m=new THREE.Mesh(buildGeo(o),new THREE.MeshStandardMaterial({color:o.color,roughness:o.rough,metalness:o.metal,flatShading:!o.smooth,wireframe:o.wire||wireAll,side:THREE.DoubleSide}));
+ const m=new THREE.Mesh(buildGeo(o),new THREE.MeshStandardMaterial({color:o.color,roughness:o.rough,metalness:o.metal,flatShading:!o.smooth,wireframe:o.wire||wireAll,side:THREE.DoubleSide,transparent:(o.opacity??1)<1,opacity:o.opacity??1,depthWrite:(o.opacity??1)>=1}));
  m.userData.id=o.id;applyT(o,m);m.visible=o.vis;return m;
 }
 function updMat(o){
  const m=meshes.get(o.id);if(!m)return;const mt=m.material;
  mt.color.set(o.color);mt.roughness=o.rough;mt.metalness=o.metal;mt.wireframe=o.wire||wireAll;
+ const op=o.opacity??1,tr=op<1;mt.opacity=op;if(mt.transparent!==tr){mt.transparent=tr;mt.depthWrite=!tr;mt.needsUpdate=true}
  if(mt.flatShading!==!o.smooth){mt.flatShading=!o.smooth;mt.needsUpdate=true}
 }
 function replaceGeo(o){const m=meshes.get(o.id);if(!m)return;m.geometry.dispose();m.geometry=buildGeo(o)}
@@ -760,6 +761,7 @@ function renderProps(){
   P.innerHTML=`<h3>${msel.size} selected</h3><p class="mut">Group them to move them together, or to keep them labelled as one thing.</p>
   <div class="tools"><button class="b pri" data-cmd="group">Group (Ctrl+G)</button><button class="b" data-cmd="del">Delete all</button><button class="b" data-cmd="desel">Deselect</button></div>
   <label class="f"><span>Colour all</span><input type="color" id="mCol" value="${(selParts()[0]||{}).color||'#ffffff'}"></label>
+  <label class="f"><span>Opacity all</span><input type="range" id="mOpa" min="0" max="1" step="0.01" value="${(selParts()[0]||{}).opacity??1}"></label>
   <label class="f"><span>Move into</span>${parentSel(o,[...msel])}</label>
   <p class="mut">Shift or Ctrl-click to add or remove items.</p>`;return;
  }
@@ -769,6 +771,7 @@ function renderProps(){
   <label class="f"><span>Name</span><input id="pName" value="${esc(o.name)}"></label>
   <label class="f"><span>In group</span>${parentSel(o,[o.id])}</label>
   <label class="f"><span>Colour all</span><input type="color" id="mCol" value="${(selParts()[0]||{}).color||'#ffffff'}"></label>
+  <label class="f"><span>Opacity all</span><input type="range" id="mOpa" min="0" max="1" step="0.01" value="${(selParts()[0]||{}).opacity??1}"></label>
   ${tri('Position','pos',o.pos,0.1)}${tri('Rotation°','rot',o.rot,5)}${tri('Scale','scl',o.scl,0.1)}
   <p class="mut">${kidsOf(o.id).length} item${kidsOf(o.id).length===1?'':'s'} inside (${parts} part${parts===1?'':'s'}). Moving the group moves all of it. In the viewport, click again on a part to pick just that part.</p>
   <h3 class="s">Pivot</h3>
@@ -789,6 +792,7 @@ function renderProps(){
  <label class="f"><span>Colour</span><input type="color" id="pCol" value="${o.color}"></label>
  <label class="f"><span>Roughness</span><input type="range" id="pRough" min="0" max="1" step="0.01" value="${o.rough}"></label>
  <label class="f"><span>Metalness</span><input type="range" id="pMetal" min="0" max="1" step="0.01" value="${o.metal}"></label>
+ <label class="f"><span>Opacity</span><input type="range" id="pOpa" min="0" max="1" step="0.01" value="${o.opacity??1}"></label>
  <label class="chk"><input type="checkbox" id="pSmooth" ${o.smooth?'checked':''}> Smooth shading</label>
  <label class="chk"><input type="checkbox" id="pWire" ${o.wire?'checked':''}> Wireframe</label>
  <h3 class="s">Shape · ${o.custom?'Mesh':esc(PRIM[o.type].n)}</h3>${shape}
@@ -808,10 +812,12 @@ RP.addEventListener('input',e=>{
  if(t.id==='multi'){multi=t.checked;return}
  if(!o)return;
  if(t.id==='mCol'){selParts().forEach(p=>{p.color=t.value;updMat(p)});return}
+ if(t.id==='mOpa'){selParts().forEach(p=>{p.opacity=+t.value;updMat(p)});return}
  if(t.dataset.t){const v=parseFloat(t.value);if(!isFinite(v))return;o[t.dataset.t.slice(0,3)][+t.dataset.t[3]]=v;applyT(o,N(o.id));return}
  if(t.id==='pCol'){o.color=t.value;updMat(o)}
  else if(t.id==='pRough'){o.rough=+t.value;updMat(o)}
  else if(t.id==='pMetal'){o.metal=+t.value;updMat(o)}
+ else if(t.id==='pOpa'){o.opacity=+t.value;updMat(o)}
 });
 RP.addEventListener('change',e=>{
  const t=e.target,o=cur();if(!o||t.id==='multi'||t.id==='noiseAmt')return;
@@ -921,7 +927,7 @@ function buildOBJ(){
 }
 function buildMTL(){
  const c=new THREE.Color();
- return '# Nugget Modeler materials\n'+exportList().map(o=>{c.set(o.color);const s=(.04+o.metal*.6).toFixed(3);return `newmtl mat_${safe(o.name)}\nKa 0 0 0\nKd ${c.r.toFixed(4)} ${c.g.toFixed(4)} ${c.b.toFixed(4)}\nKs ${s} ${s} ${s}\nNs ${Math.round((1-o.rough)*200+10)}\nd 1\nillum 2\n`}).join('\n');
+ return '# Nugget Modeler materials\n'+exportList().map(o=>{c.set(o.color);const s=(.04+o.metal*.6).toFixed(3);return `newmtl mat_${safe(o.name)}\nKa 0 0 0\nKd ${c.r.toFixed(4)} ${c.g.toFixed(4)} ${c.b.toFixed(4)}\nKs ${s} ${s} ${s}\nNs ${Math.round((1-o.rough)*200+10)}\nd ${o.opacity??1}\nTr ${(1-(o.opacity??1)).toFixed(2)}\nillum 2\n`}).join('\n');
 }
 function openExport(){
  if(edit)exitEdit();
@@ -965,7 +971,7 @@ function buildModelJSON(){
   const g=meshes.get(o.id).geometry,pa=g.attributes.position.array;
   const idx=g.index?Array.from(g.index.array):Array.from({length:pa.length/3},(_,i)=>i);
   return{id:o.id,name:safe(o.name),label:o.name,...xf(o),
-   material:{color:o.color,roughness:o.rough,metalness:o.metal,smooth:o.smooth},
+   material:{color:o.color,roughness:o.rough,metalness:o.metal,opacity:o.opacity??1,smooth:o.smooth},
    vertexCount:pa.length/3,triangleCount:idx.length/3,
    positions:Array.from(pa,f5),indices:idx};
  });
@@ -986,7 +992,7 @@ function loadModelJSON(d){
   const o=newObj('custom',p.label||p.name);o.parent=pid(p);
   o.custom={p:p.positions.slice(),i:p.indices?p.indices.slice():null};
   o.pos=(p.pivot||[0,0,0]).slice();o.rot=(p.rotation||[0,0,0]).slice();o.scl=(p.scale||[1,1,1]).slice();
-  const mt=p.material||{};if(mt.color)o.color=mt.color;if(mt.roughness!=null)o.rough=mt.roughness;if(mt.metalness!=null)o.metal=mt.metalness;if(mt.smooth!=null)o.smooth=mt.smooth;
+  const mt=p.material||{};if(mt.color)o.color=mt.color;if(mt.roughness!=null)o.rough=mt.roughness;if(mt.metalness!=null)o.metal=mt.metalness;if(mt.smooth!=null)o.smooth=mt.smooth;if(mt.opacity!=null)o.opacity=mt.opacity;
   objs.push(o);const m=makeMesh(o);pnode(o).add(m);meshes.set(o.id,m);if(o.parent==null||lastId==null)lastId=o.id;
  }
  select(lastId);commit();focus();

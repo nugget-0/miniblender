@@ -79,6 +79,23 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
  input{font-size:16px}
  .f3 input{font-size:14px}
 }
+/* ---------- phone mode ---------- */
+#dock{display:none}
+body.phone{overflow:hidden}
+body.phone #app{display:block;height:100dvh}
+body.phone #vp{position:fixed;left:0;right:0;top:0;bottom:calc(66px + env(safe-area-inset-bottom))}
+body.phone header,body.phone #left,body.phone #right{position:fixed;left:0;right:0;bottom:calc(66px + env(safe-area-inset-bottom));max-height:58dvh;overflow:auto;z-index:5;border:0;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:0 -12px 32px rgba(0,0,0,.28);display:none;padding:14px}
+body.phone header.open{display:flex}
+body.phone #left.open,body.phone #right.open{display:block}
+body.phone footer{position:fixed;top:8px;right:8px;background:none;border:0;padding:0;z-index:4;pointer-events:none}
+body.phone #stat{display:none}
+body.phone #msg{background:var(--panel);padding:5px 9px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+body.phone #msg:empty{display:none}
+body.phone .b{height:44px;min-width:44px}
+body.phone input,body.phone select{font-size:16px}
+body.phone #dock{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc(66px + env(safe-area-inset-bottom));padding:8px 8px calc(8px + env(safe-area-inset-bottom));gap:6px;overflow-x:auto;background:var(--panel);border-top:1px solid var(--line);z-index:6;scroll-snap-type:x proximity}
+#dock .b{height:50px;min-width:56px;flex:none;font-size:12px;padding:0 10px}
+#dock .sep{flex:none;width:1px;background:var(--line);margin:6px 2px}
 @media(prefers-reduced-motion:no-preference){.b{transition:background .15s,border-color .15s}}
 </style>
 </head>
@@ -96,7 +113,7 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
   <button class="b" data-cmd="undo">Undo</button><button class="b" data-cmd="redo">Redo</button><button class="b" data-cmd="dup">Duplicate</button><button class="b" data-cmd="del">Delete</button><button class="b" data-cmd="group">Group<kbd>Ctrl+G</kbd></button><button class="b" data-cmd="ungroup">Ungroup</button>
  </div>
  <div class="grp"><small>View</small>
-  <button class="b" data-cmd="vpersp">3D</button><button class="b" data-cmd="vtop">Top</button><button class="b" data-cmd="vfront">Front</button><button class="b" data-cmd="vright">Side</button><button class="b" data-cmd="focus">Focus<kbd>F</kbd></button><button class="b on" data-cmd="grid">Grid</button><button class="b" data-cmd="wireall">Wire</button>
+  <button class="b" data-cmd="vpersp">3D</button><button class="b" data-cmd="vtop">Top</button><button class="b" data-cmd="vfront">Front</button><button class="b" data-cmd="vright">Side</button><button class="b" data-cmd="focus">Focus<kbd>F</kbd></button><button class="b on" data-cmd="grid">Grid</button><button class="b" data-cmd="wireall">Wire</button><button class="b" data-cmd="phone">Phone mode</button>
  </div>
  <div class="grp"><small>File</small>
   <button class="b pri" data-cmd="expjson">Export JSON</button><button class="b" data-cmd="export">Export…</button><button class="b" data-cmd="import">Import OBJ</button><button class="b" data-cmd="save">Save project</button><button class="b" data-cmd="open">Open project</button><button class="b" data-cmd="new">New</button>
@@ -119,6 +136,13 @@ textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var
 <aside id="right"><div id="props"></div></aside>
 
 <footer><span id="stat"></span><span id="msg"></span></footer>
+<nav id="dock" aria-label="Phone tools">
+ <button class="b" data-ph="menu">Menu</button><button class="b" data-ph="parts">Parts</button><button class="b" data-ph="props">Props</button><span class="sep"></span>
+ <button class="b" data-cmd="move">Move</button><button class="b" data-cmd="rotate">Rotate</button><button class="b" data-cmd="scale">Scale</button><button class="b" data-cmd="pivot">Pivot</button><button class="b" data-cmd="edit">Verts</button><span class="sep"></span>
+ <button class="b" data-ph="multi">Multi</button><button class="b" data-cmd="box">Box</button><button class="b" data-cmd="group">Group</button><span class="sep"></span>
+ <button class="b" data-cmd="undo">Undo</button><button class="b" data-cmd="redo">Redo</button><button class="b" data-cmd="dup">Copy</button><button class="b" data-cmd="del">Delete</button><button class="b" data-cmd="focus">Focus</button><span class="sep"></span>
+ <button class="b pri" data-cmd="expjson">Export</button><button class="b" data-cmd="phone">PC mode</button>
+</nav>
 </div>
 
 <div id="modal" hidden>
@@ -558,9 +582,9 @@ renderer.domElement.addEventListener('pointerup',e=>{
  if(!down)return;const d=down;down=null;
  if(d.g||Math.hypot(e.clientX-d.x,e.clientY-d.y)>6)return;
  const r=renderer.domElement.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
- if(edit){pickVert(px,py,e.shiftKey||multi);return}
+ if(edit){pickVert(px,py,e.shiftKey||multi||tapAdd);return}
  ndc.set(px/r.width*2-1,-(py/r.height)*2+1);ray.setFromCamera(ndc,camera);
- const add=e.shiftKey||e.ctrlKey||e.metaKey;
+ const add=e.shiftKey||e.ctrlKey||e.metaKey||tapAdd;
  const hits=ray.intersectObjects([...meshes.values()].filter(m=>effVis(byId(m.userData.id))),false);
  if(!hits.length){if(!add)select(null);return}
  // first click picks the outermost group, clicking again goes one level deeper down to the part
@@ -686,7 +710,7 @@ $('#q').addEventListener('input',renderList);
 $('#list').addEventListener('click',e=>{
  const li=e.target.closest('li[data-id]');if(!li)return;const id=+li.dataset.id;const a=e.target.closest('[data-a]');
  if(a){if(a.dataset.a==='open'){const g=byId(id);g.open=g.open===false;renderList();persist();return}a.dataset.a==='vis'?toggleVis(id):toggleLock(id);return}
- const add=e.shiftKey||e.ctrlKey||e.metaKey;if(!add)msel.clear();
+ const add=e.shiftKey||e.ctrlKey||e.metaKey||tapAdd;if(!add)msel.clear();
  if(edit&&id!==sel)exitEdit(true);select(id,add);
 });
 /* drag items onto a group to put them in it; drop on empty space to take them out */
@@ -806,8 +830,8 @@ RP.addEventListener('change',e=>{
 /* ---------- toolbar / commands ---------- */
 function setMode(m){pivMode=false;mode=m;tc.setMode(m);if(!edit)select(sel);btns();hint()}
 function btns(){
- const on={move:mode==='translate'&&!pivMode,rotate:mode==='rotate'&&!pivMode,scale:mode==='scale'&&!pivMode,edit,pivot:pivMode,box:boxMode,snap:snapOn,space:local,grid:grid.visible,wireall:wireAll};
- for(const b of document.querySelectorAll('header [data-cmd]'))if(b.dataset.cmd in on)b.classList.toggle('on',on[b.dataset.cmd]);
+ const on={move:mode==='translate'&&!pivMode,rotate:mode==='rotate'&&!pivMode,scale:mode==='scale'&&!pivMode,edit,pivot:pivMode,box:boxMode,phone,snap:snapOn,space:local,grid:grid.visible,wireall:wireAll};
+ for(const b of document.querySelectorAll('header [data-cmd],#dock [data-cmd]'))if(b.dataset.cmd in on)b.classList.toggle('on',on[b.dataset.cmd]);
 }
 function hint(){
  const o=cur();
@@ -825,6 +849,7 @@ const CMD={
  grid:()=>{grid.visible=!grid.visible;axes.visible=grid.visible;btns()},
  wireall:()=>{wireAll=!wireAll;objs.forEach(updMat);btns()},
  mx:()=>mirror(0),my:()=>mirror(1),mz:()=>mirror(2),floor,reset:resetT,apply:meshOnly(applyTransform),noise:meshOnly(noise),flip:meshOnly(flipNormals),convert:meshOnly(convert),
+ phone:()=>{setPhone(!phone);toast(phone?'Phone mode on':'PC mode on')},
  box:()=>{boxMode=!boxMode;orbit.enabled=!boxMode;btns();toast(boxMode?'Box select on: drag to select (Shift adds). Turn it off to orbit again.':'Box select off')},
  group:groupSel,ungroup,selkids:selKids,desel:()=>select(null),
  vall:selAllVerts,vnone:()=>{if(ed){ed.s.clear();vertGizmo()}},vcollapse:collapse,
@@ -1016,6 +1041,24 @@ function stats(){
  const c=$('#count');if(c)c.textContent='';
 }
 
+/* ---------- phone mode: full-screen view, bottom dock, slide-up sheets ---------- */
+let phone=false,tapAdd=false;
+const SHEETS={menu:'header',parts:'#left',props:'#right'};
+function closeSheets(){for(const k in SHEETS)$(SHEETS[k]).classList.remove('open');for(const b of document.querySelectorAll('#dock [data-ph]'))if(b.dataset.ph in SHEETS)b.classList.remove('on')}
+function setPhone(on){
+ phone=on;document.body.classList.toggle('phone',on);tc.setSize(on?1.35:.9);closeSheets();
+ try{localStorage.setItem('nugget-modeler-phone',on?'1':'0')}catch(e){}
+ btns();resize();
+}
+$('#dock').addEventListener('click',e=>{
+ const b=e.target.closest('[data-ph]');if(!b)return;const k=b.dataset.ph;
+ if(k==='multi'){tapAdd=!tapAdd;b.classList.toggle('on',tapAdd);toast(tapAdd?'Multi on: each tap adds to the selection':'Multi off');return}
+ const el=$(SHEETS[k]),was=el.classList.contains('open');closeSheets();
+ if(!was){el.classList.add('open');b.classList.add('on')}
+});
+// after adding a shape or running a menu command, close the menu sheet so the view is visible
+$('header').addEventListener('click',e=>{if(phone&&e.target.closest('[data-add],[data-cmd]')&&!e.target.closest('[data-cmd=phone]'))closeSheets()});
+
 /* ---------- boot ---------- */
 function seed(){
  const a=newObj('box','Crate');a.pos=[0,.5,0];a.color='#c98b4f';a.smooth=false;
@@ -1026,6 +1069,8 @@ function seed(){
 let saved=null;try{saved=localStorage.getItem(KEY)}catch(e){}
 if(saved){try{const d=JSON.parse(saved);if(!Array.isArray(d.objs))throw 0;objs=d.objs;nid=d.nid}catch(e){seed()}}else seed();
 rebuildAll();last=snap();select(null);btns();
+{let p=null;try{p=localStorage.getItem('nugget-modeler-phone')}catch(e){}
+ setPhone(p?p==='1':(matchMedia('(pointer:coarse)').matches&&Math.min(innerWidth,innerHeight)<820))}
 
 function resize(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
 const ro=new ResizeObserver(resize);ro.observe(vp);resize();

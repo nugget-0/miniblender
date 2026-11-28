@@ -113,7 +113,7 @@ body.phone #dock{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc
   <button class="b" data-cmd="undo">Undo</button><button class="b" data-cmd="redo">Redo</button><button class="b" data-cmd="dup">Duplicate</button><button class="b" data-cmd="del">Delete</button><button class="b" data-cmd="group">Group<kbd>Ctrl+G</kbd></button><button class="b" data-cmd="ungroup">Ungroup</button>
  </div>
  <div class="grp"><small>View</small>
-  <button class="b" data-cmd="vpersp">3D</button><button class="b" data-cmd="vtop">Top</button><button class="b" data-cmd="vfront">Front</button><button class="b" data-cmd="vright">Side</button><button class="b" data-cmd="focus">Focus<kbd>F</kbd></button><button class="b on" data-cmd="grid">Grid</button><button class="b" data-cmd="wireall">Wire</button><button class="b" data-cmd="phone">Phone mode</button><button class="b" data-cmd="glowfx">Glow</button>
+  <button class="b" data-cmd="vpersp">3D</button><button class="b" data-cmd="vtop">Top</button><button class="b" data-cmd="vfront">Front</button><button class="b" data-cmd="vright">Side</button><button class="b" data-cmd="focus">Focus<kbd>F</kbd></button><button class="b on" data-cmd="grid">Grid</button><button class="b on" data-cmd="axes">Axes</button><button class="b" data-cmd="wireall">Wire</button><button class="b" data-cmd="phone">Phone mode</button><button class="b" data-cmd="glowfx">Glow</button>
  </div>
  <div class="grp"><small>File</small>
   <button class="b pri" data-cmd="expjson">Export JSON</button><button class="b" data-cmd="export">Export…</button><button class="b" data-cmd="import">Import OBJ</button><button class="b" data-cmd="save">Save project</button><button class="b" data-cmd="open">Open project</button><button class="b" data-cmd="new">New</button>
@@ -987,7 +987,7 @@ RP.addEventListener('change',e=>{
 /* ---------- toolbar / commands ---------- */
 function setMode(m){pivMode=false;mode=m;tc.setMode(m);if(!edit)select(sel);btns();hint()}
 function btns(){
- const on={move:mode==='translate'&&!pivMode,rotate:mode==='rotate'&&!pivMode,scale:mode==='scale'&&!pivMode,edit,pivot:pivMode,box:boxMode,phone,glowfx:glowOn,snap:snapOn,space:local,grid:grid.visible,wireall:wireAll};
+ const on={move:mode==='translate'&&!pivMode,rotate:mode==='rotate'&&!pivMode,scale:mode==='scale'&&!pivMode,edit,pivot:pivMode,box:boxMode,phone,glowfx:glowOn,snap:snapOn,space:local,grid:grid.visible,axes:axes.visible,wireall:wireAll};
  for(const b of document.querySelectorAll('header [data-cmd],#dock [data-cmd]'))if(b.dataset.cmd in on)b.classList.toggle('on',on[b.dataset.cmd]);
 }
 function hint(){
@@ -1003,7 +1003,8 @@ const CMD={
  space:()=>{local=!local;tc.setSpace(local?'local':'world');btns()},
  undo:doUndo,redo:doRedo,dup,del,
  vpersp:()=>view('vpersp'),vtop:()=>view('vtop'),vfront:()=>view('vfront'),vright:()=>view('vright'),focus,
- grid:()=>{grid.visible=!grid.visible;axes.visible=grid.visible;btns()},
+ grid:()=>{grid.visible=!grid.visible;btns()},
+ axes:()=>{axes.visible=!axes.visible;try{localStorage.setItem('nugget-modeler-axes',axes.visible?'1':'0')}catch(e){}btns()},
  wireall:()=>{wireAll=!wireAll;objs.forEach(updMat);btns()},
  mx:()=>mirror(0),my:()=>mirror(1),mz:()=>mirror(2),floor,reset:resetT,apply:meshOnly(applyTransform),noise:meshOnly(noise),flip:meshOnly(flipNormals),convert:meshOnly(convert),
  glowfx:()=>{glowOn=!glowOn;try{localStorage.setItem('nugget-modeler-glow',glowOn?'1':'0')}catch(e){}btns();toast(glowOn?'Glow effect on':'Glow effect off (faster on slow phones)')},
@@ -1269,6 +1270,7 @@ function seed(){
 }
 let saved=null;try{saved=localStorage.getItem(KEY)}catch(e){}
 if(saved){try{const d=JSON.parse(saved);if(!Array.isArray(d.objs))throw 0;objs=d.objs;nid=d.nid}catch(e){seed()}}else seed();
+try{if(localStorage.getItem('nugget-modeler-axes')==='0')axes.visible=false}catch(e){}
 rebuildAll();last=snap();select(null);btns();
 {let p=null;try{p=localStorage.getItem('nugget-modeler-phone')}catch(e){}
  setPhone(p?p==='1':(matchMedia('(pointer:coarse)').matches&&Math.min(innerWidth,innerHeight)<820))}

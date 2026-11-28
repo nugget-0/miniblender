@@ -104,7 +104,7 @@ body.phone #dock{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc
 <header>
  <div class="brand"><i></i>Nugget Modeler</div>
  <div class="grp"><small>Add</small>
-  <button class="b" data-add="box">Cube</button><button class="b" data-add="sphere">Sphere</button><button class="b" data-add="cyl">Cylinder</button><button class="b" data-add="cone">Cone</button><button class="b" data-add="pyr">Pyramid</button><button class="b" data-add="prism">Prism</button><button class="b" data-add="torus">Torus</button><button class="b" data-add="ico">Icosphere</button><button class="b" data-add="plane">Plane</button><button class="b" data-add="knot">Knot</button>
+  <button class="b" data-add="box">Cube</button><button class="b" data-add="sphere">Sphere</button><button class="b" data-add="cyl">Cylinder</button><button class="b" data-add="tube">Hollow Cyl</button><button class="b" data-add="cone">Cone</button><button class="b" data-add="pyr">Pyramid</button><button class="b" data-add="prism">Prism</button><button class="b" data-add="torus">Torus</button><button class="b" data-add="ico">Icosphere</button><button class="b" data-add="plane">Plane</button><button class="b" data-add="knot">Knot</button>
  </div>
  <div class="grp"><small>Tool</small>
   <button class="b on" data-cmd="move">Move<kbd>W</kbd></button><button class="b" data-cmd="rotate">Rotate<kbd>E</kbd></button><button class="b" data-cmd="scale">Scale<kbd>R</kbd></button><button class="b" data-cmd="edit">Edit verts<kbd>Tab</kbd></button><button class="b" data-cmd="pivot">Pivot<kbd>P</kbd></button><button class="b" data-cmd="box">Box<kbd>hold T</kbd></button><button class="b" data-cmd="snap">Snap</button><button class="b" data-cmd="space">Local</button>
@@ -192,6 +192,10 @@ const PRIM={
  box:{n:'Cube',p:{w:1,h:1,d:1,seg:1},g:p=>new THREE.BoxGeometry(p.w,p.h,p.d,p.seg,p.seg,p.seg)},
  sphere:{n:'Sphere',p:{r:.6,ws:24,hs:16},g:p=>new THREE.SphereGeometry(p.r,p.ws,p.hs)},
  cyl:{n:'Cylinder',p:{rt:.5,rb:.5,h:1,seg:24},g:p=>new THREE.CylinderGeometry(p.rt,p.rb,p.h,p.seg)},
+ tube:{n:'Hollow Cylinder',p:{ro:.5,ri:.35,h:1,seg:32},g:p=>{
+  // a ring-shaped profile spun around the Y axis: outer wall, top rim, inner wall, bottom rim
+  const ro=Math.max(.002,p.ro),ri=Math.min(Math.max(.001,p.ri),ro-.001),h=p.h/2;
+  return new THREE.LatheGeometry([new THREE.Vector2(ri,-h),new THREE.Vector2(ro,-h),new THREE.Vector2(ro,h),new THREE.Vector2(ri,h),new THREE.Vector2(ri,-h)],p.seg)}},
  cone:{n:'Cone',p:{r:.5,h:1,seg:24},g:p=>new THREE.ConeGeometry(p.r,p.h,p.seg)},
  pyr:{n:'Pyramid',p:{r:.7,h:1,sides:4},g:p=>new THREE.ConeGeometry(p.r,p.h,p.sides)},
  prism:{n:'Prism',p:{r:.6,h:1,sides:3},g:p=>new THREE.CylinderGeometry(p.r,p.r,p.h,p.sides)},
@@ -200,7 +204,7 @@ const PRIM={
  plane:{n:'Plane',p:{w:2,h:2,seg:1},g:p=>new THREE.PlaneGeometry(p.w,p.h,p.seg,p.seg).rotateX(-Math.PI/2)},
  knot:{n:'Knot',p:{r:.5,t:.15,ts:96,rs:12,p:2,q:3},g:p=>new THREE.TorusKnotGeometry(p.r,p.t,p.ts,p.rs,p.p,p.q)}
 };
-const LBL={w:'Width',h:'Height',d:'Depth',seg:'Segments',r:'Radius',ws:'Width segs',hs:'Height segs',rt:'Top radius',rb:'Bottom radius',R:'Ring radius',t:'Thickness',rs:'Radial segs',ts:'Tube segs',sides:'Sides',detail:'Detail',p:'Winds P',q:'Winds Q'};
+const LBL={w:'Width',h:'Height',d:'Depth',seg:'Segments',r:'Radius',ws:'Width segs',hs:'Height segs',rt:'Top radius',ro:'Outer radius',ri:'Inner radius',rb:'Bottom radius',R:'Ring radius',t:'Thickness',rs:'Radial segs',ts:'Tube segs',sides:'Sides',detail:'Detail',p:'Winds P',q:'Winds Q'};
 const IMIN={seg:1,ws:3,hs:2,rs:2,ts:3,sides:3,detail:0,p:1,q:1};
 const SMOOTH=new Set(['sphere','cyl','cone','torus','knot','custom']);
 

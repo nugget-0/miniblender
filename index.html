@@ -64,8 +64,17 @@ select{font:inherit;color:inherit;background:var(--in);border:1px solid var(--li
 .tools{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
 footer{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px;padding:5px 12px;font-size:12px;color:var(--mut);background:var(--panel);border-top:1px solid var(--line)}
 #msg{color:var(--acc);font-weight:600}
-#modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px;z-index:9}
-#modal[hidden]{display:none}
+#modal,#pmodal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px;z-index:9}
+#modal[hidden],#pmodal[hidden]{display:none}
+#pname{font-weight:600;font-size:13px;color:var(--mut);cursor:pointer;margin-left:4px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pname:hover{color:var(--acc)}
+#pmodal .tools input{flex:1;min-width:140px;width:auto}
+#plist{list-style:none;padding:0;margin:12px 0}
+#plist li{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
+#plist li.cur{border-color:var(--acc);background:var(--accs)}
+#plist .tools{margin:0}
+#plist .tag{font-size:11px;color:var(--acc);font-weight:700;margin-left:6px}
+#plist input{width:auto}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(560px,100%);max-height:90dvh;overflow:auto}
 .card h3{font-size:18px}
 textarea{width:100%;height:150px;font:12px ui-monospace,monospace;background:var(--in);color:inherit;border:1px solid var(--line);border-radius:8px;padding:8px}
@@ -102,7 +111,7 @@ body.phone #dock{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc
 <body>
 <div id="app">
 <header>
- <div class="brand"><i></i>Nugget Modeler</div>
+ <div class="brand"><i></i>Nugget Modeler<span id="pname" title="Switch project"></span></div>
  <div class="grp"><small>Add</small>
   <button class="b" data-add="box">Cube</button><button class="b" data-add="sphere">Sphere</button><button class="b" data-add="cyl">Cylinder</button><button class="b" data-add="tube">Hollow Cyl</button><button class="b" data-add="cone">Cone</button><button class="b" data-add="pyr">Pyramid</button><button class="b" data-add="prism">Prism</button><button class="b" data-add="torus">Torus</button><button class="b" data-add="ico">Icosphere</button><button class="b" data-add="plane">Plane</button><button class="b" data-add="knot">Knot</button>
  </div>
@@ -116,7 +125,7 @@ body.phone #dock{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc
   <button class="b" data-cmd="vpersp">3D</button><button class="b" data-cmd="vtop">Top</button><button class="b" data-cmd="vfront">Front</button><button class="b" data-cmd="vright">Side</button><button class="b" data-cmd="focus">Focus<kbd>F</kbd></button><button class="b on" data-cmd="grid">Grid</button><button class="b on" data-cmd="axes">Axes</button><button class="b" data-cmd="wireall">Wire</button><button class="b" data-cmd="phone">Phone mode</button><button class="b" data-cmd="glowfx">Glow</button>
  </div>
  <div class="grp"><small>File</small>
-  <button class="b pri" data-cmd="expjson">Export JSON</button><button class="b" data-cmd="export">Export…</button><button class="b" data-cmd="import">Import OBJ</button><button class="b" data-cmd="save">Save project</button><button class="b" data-cmd="open">Open project</button><button class="b" data-cmd="new">New</button>
+  <button class="b" data-cmd="projects">Projects</button><button class="b pri" data-cmd="expjson">Export JSON</button><button class="b" data-cmd="export">Export…</button><button class="b" data-cmd="import">Import OBJ</button><button class="b" data-cmd="save">Save project</button><button class="b" data-cmd="open">Open project</button><button class="b" data-cmd="new">New project</button>
  </div>
 </header>
 
@@ -141,7 +150,7 @@ body.phone #dock{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc
  <button class="b" data-cmd="move">Move</button><button class="b" data-cmd="rotate">Rotate</button><button class="b" data-cmd="scale">Scale</button><button class="b" data-cmd="pivot">Pivot</button><button class="b" data-cmd="edit">Verts</button><span class="sep"></span>
  <button class="b" data-ph="multi">Multi</button><button class="b" data-cmd="box">Box</button><button class="b" data-cmd="group">Group</button><span class="sep"></span>
  <button class="b" data-cmd="undo">Undo</button><button class="b" data-cmd="redo">Redo</button><button class="b" data-cmd="dup">Copy</button><button class="b" data-cmd="del">Delete</button><button class="b" data-cmd="focus">Focus</button><span class="sep"></span>
- <button class="b pri" data-cmd="expjson">Export</button><button class="b" data-cmd="phone">PC mode</button>
+ <button class="b" data-cmd="projects">Projects</button><button class="b pri" data-cmd="expjson">Export</button><button class="b" data-cmd="phone">PC mode</button>
 </nav>
 </div>
 
@@ -162,6 +171,15 @@ body.phone #dock{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc
  </div>
 </div>
 
+<div id="pmodal" hidden>
+ <div class="card">
+  <h3>Projects</h3>
+  <p class="mut">Each project saves on its own in this browser, so you can switch between them any time.</p>
+  <div class="tools"><input id="pnew" placeholder="New project name" aria-label="New project name"><button class="b pri" data-cmd="pcreate">New project</button></div>
+  <ul id="plist"></ul>
+  <div class="tools"><button class="b" data-cmd="pclose">Close</button></div>
+ </div>
+</div>
 <input type="file" id="fOpen" accept=".json,application/json" hidden>
 <input type="file" id="fImp" accept=".obj" hidden>
 
@@ -396,7 +414,7 @@ function dropToFloor(o){
 /* ---------- undo / save ---------- */
 let undo=[],redo=[],last='';
 const snap=()=>JSON.stringify({objs,nid});
-function persist(){try{localStorage.setItem(KEY,last)}catch(e){}}
+function persist(){try{localStorage.setItem(KEY,last)}catch(e){}saveSoon()}
 function commit(){const s=snap();if(s===last)return;undo.push(last);if(undo.length>100)undo.shift();redo=[];last=s;persist();stats()}
 function restore(s){
  if(edit)exitEdit(true);
@@ -1027,8 +1045,10 @@ const CMD={
  dlpiv:()=>saveFile(fname()+'.model.json',buildModelJSON()),
  cppiv:()=>copy(buildModelJSON(),'Model JSON copied'),
  import:()=>$('#fImp').click(),open:()=>$('#fOpen').click(),
- save:()=>saveFile('nugget-model-project.json',JSON.stringify({app:'nugget-modeler',v:1,objs,nid})),
- new:()=>{if(edit)exitEdit(true);objs=[];rebuildAll();select(null);commit();toast('New scene (Ctrl+Z brings the old one back)')}
+ projects:openProjects,pclose:()=>{$('#pmodal').hidden=true},
+ pcreate:()=>{const i=$('#pnew');newProject(i.value.trim()||'Untitled');i.value=''},
+ save:()=>saveFile(safe(curName||'nugget-model')+'.project.json',JSON.stringify({app:'nugget-modeler',v:1,objs,nid})),
+ new:()=>{openProjects();setTimeout(()=>$('#pnew').focus(),50)}
 };
 document.addEventListener('click',e=>{
  const a=e.target.closest('[data-add]');if(a){addPrim(a.dataset.add);return}
@@ -1171,7 +1191,8 @@ $('#fOpen').addEventListener('change',async e=>{
  const f=e.target.files[0];e.target.value='';if(!f)return;
  try{const d=JSON.parse(await f.text());
   if(d.format==='nugget-model'&&Array.isArray(d.parts)){loadModelJSON(d);toast('Added model '+f.name);return}
-  if(!Array.isArray(d.objs))throw 0;if(edit)exitEdit(true);objs=d.objs;nid=d.nid||objs.reduce((a,o)=>Math.max(a,o.id+1),1);rebuildAll();select(null);commit();focus();toast('Opened '+f.name)}
+  if(!Array.isArray(d.objs))throw 0;
+  await openAsProject(f.name.replace(/(\.project)?\.json$/i,''),JSON.stringify({objs:d.objs,nid:d.nid||d.objs.reduce((a,o)=>Math.max(a,o.id+1),1)}));toast('Opened '+f.name+(IDB.db?' as a new project':''))}
  catch(err){toast('That file is not a Nugget Modeler project')}
 });
 function importOBJ(text,fn){
@@ -1265,6 +1286,87 @@ $('#dock').addEventListener('click',e=>{
 // after adding a shape or running a menu command, close the menu sheet so the view is visible
 $('header').addEventListener('click',e=>{if(phone&&e.target.closest('[data-add],[data-cmd]')&&!e.target.closest('[data-cmd=phone]'))closeSheets()});
 
+/* ---------- projects (IndexedDB): many separate scenes, each autosaved ---------- */
+const IDB={db:null,
+ open(){return new Promise((res,rej)=>{if(!window.indexedDB)return rej(new Error('no idb'));const r=indexedDB.open('nugget-modeler',1);
+  r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('projects'))r.result.createObjectStore('projects',{keyPath:'id'})};
+  r.onsuccess=()=>{this.db=r.result;res(this.db)};r.onerror=()=>rej(r.error)})},
+ store(mode){return this.db.transaction('projects',mode).objectStore('projects')},
+ wrap(r){return new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})},
+ all(){return this.wrap(this.store('readonly').getAll())},get(id){return this.wrap(this.store('readonly').get(id))},
+ put(p){return this.wrap(this.store('readwrite').put(p))},del(id){return this.wrap(this.store('readwrite').delete(id))}};
+let curProj=null,curName='',saveT=0;
+const newPid=()=>'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const partCount=()=>objs.filter(o=>!isG(o)).length;
+function saveSoon(){clearTimeout(saveT);saveT=setTimeout(flushSave,400)}
+async function flushSave(){clearTimeout(saveT);if(!IDB.db||!curProj)return;try{await IDB.put({id:curProj,name:curName,updated:Date.now(),data:last,count:partCount()})}catch(e){toast('Could not save the project (storage full?)')}}
+addEventListener('pagehide',()=>{flushSave()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)flushSave()});
+function setCur(){try{localStorage.setItem('nugget-modeler-current',curProj||'')}catch(e){}$('#pname').textContent=curName?'· '+curName:'';document.title=(curName?curName+' · ':'')+'Nugget Modeler'}
+function loadData(str){
+ if(edit)exitEdit(true);
+ const d=JSON.parse(str);objs=Array.isArray(d.objs)?d.objs:[];nid=d.nid||objs.reduce((a,o)=>Math.max(a,o.id+1),1);
+ undo=[];redo=[];last=snap();sel=null;msel=new Set();rebuildAll();select(null);
+ try{localStorage.setItem(KEY,last)}catch(e){}
+ stats();focus();
+}
+async function switchProject(id){
+ if(id===curProj){$('#pmodal').hidden=true;return}
+ await flushSave();const p=await IDB.get(id);if(!p)return toast('That project is gone');
+ curProj=p.id;curName=p.name;setCur();loadData(p.data);$('#pmodal').hidden=true;toast('Opened '+p.name);
+}
+async function newProject(name){
+ const data=JSON.stringify({objs:[],nid:1});
+ if(!IDB.db){toast('Projects need IndexedDB, which this browser blocked');return}
+ await flushSave();const p={id:newPid(),name,updated:Date.now(),data,count:0};await IDB.put(p);
+ curProj=p.id;curName=name;setCur();loadData(data);$('#pmodal').hidden=true;toast('New project: '+name);
+}
+async function openAsProject(name,data){
+ if(!IDB.db){loadData(data);return}
+ await flushSave();const p={id:newPid(),name,updated:Date.now(),data,count:JSON.parse(data).objs.filter(o=>o.kind!=='group').length};
+ await IDB.put(p);curProj=p.id;curName=name;setCur();loadData(data);
+}
+async function openProjects(){$('#pmodal').hidden=false;await renderProjects()}
+async function renderProjects(){
+ const L=$('#plist');
+ if(!IDB.db){L.innerHTML='<li class="mut">Projects aren\'t available in this browser (IndexedDB is blocked). Your scene still autosaves.</li>';return}
+ await flushSave();
+ const list=(await IDB.all()).sort((a,b)=>b.updated-a.updated);
+ L.innerHTML=list.map(p=>`<li data-pid="${esc(p.id)}" class="${p.id===curProj?'cur':''}"><div class="pn"><b class="pnm">${esc(p.name)}</b>${p.id===curProj?'<span class="tag">open now</span>':''}<br><span class="mut">${p.count||0} part${p.count===1?'':'s'} · ${esc(new Date(p.updated).toLocaleString())}</span></div>
+  <div class="tools">${p.id===curProj?'':'<button class="b pri" data-pa="open">Open</button>'}<button class="b" data-pa="ren">Rename</button><button class="b" data-pa="dup">Copy</button><button class="b" data-pa="del">Delete</button></div></li>`).join('')||'<li class="mut">No projects yet.</li>';
+}
+$('#pname').addEventListener('click',openProjects);
+$('#pnew').addEventListener('keydown',e=>{if(e.key==='Enter')CMD.pcreate()});
+$('#pmodal').addEventListener('click',e=>{if(e.target.id==='pmodal')$('#pmodal').hidden=true});
+$('#plist').addEventListener('click',async e=>{
+ const b=e.target.closest('[data-pa]');if(!b)return;const li=b.closest('li'),id=li.dataset.pid,a=b.dataset.pa;
+ if(a==='open')return switchProject(id);
+ if(a==='dup'){const p=await IDB.get(id);if(!p)return;await IDB.put({...p,id:newPid(),name:p.name+' copy',updated:Date.now(),data:id===curProj?last:p.data});toast('Copied '+p.name);return renderProjects()}
+ if(a==='ren'){
+  const nm=li.querySelector('.pnm'),inp=document.createElement('input');inp.value=nm.textContent;nm.replaceWith(inp);inp.focus();inp.select();
+  let done=false;const fin=async ok=>{if(done)return;done=true;const v=inp.value.trim();
+   if(ok&&v){const p=await IDB.get(id);if(p){p.name=v;if(id===curProj){curName=v;setCur();p.data=last}await IDB.put(p)}}renderProjects()};
+  inp.addEventListener('keydown',k=>{if(k.key==='Enter')fin(true);if(k.key==='Escape')fin(false)});inp.addEventListener('blur',()=>fin(true));return;
+ }
+ if(a==='del'){
+  if(!b.dataset.armed){b.dataset.armed='1';b.textContent='Tap again to delete';b.classList.add('pri');setTimeout(()=>{if(b.isConnected){delete b.dataset.armed;b.textContent='Delete';b.classList.remove('pri')}},3000);return}
+  await IDB.del(id);toast('Project deleted');
+  if(id===curProj){curProj=null;const rest=(await IDB.all()).sort((x,y)=>y.updated-x.updated);if(rest.length){const p=rest[0];curProj=p.id;curName=p.name;setCur();loadData(p.data)}else await newProject('My project')}
+  return renderProjects();
+ }
+});
+async function initProjects(){
+ try{await IDB.open()}catch(e){setCur();return}
+ let list=[];try{list=await IDB.all()}catch(e){}
+ let id=null;try{id=localStorage.getItem('nugget-modeler-current')}catch(e){}
+ if(!list.length){ // first time: whatever is on screen now becomes your first project, so nothing is lost
+  const p={id:newPid(),name:'My project',updated:Date.now(),data:last,count:partCount()};await IDB.put(p);list=[p];id=p.id;
+ }
+ let p=list.find(x=>x.id===id);
+ if(p){curProj=p.id;curName=p.name;setCur();if(p.data!==last)flushSave()} // this browser's autosave is the newest copy
+ else{p=list.sort((a,b)=>b.updated-a.updated)[0];curProj=p.id;curName=p.name;setCur();loadData(p.data)}
+}
+
 /* ---------- boot ---------- */
 function seed(){
  const a=newObj('box','Crate');a.pos=[0,.5,0];a.color='#c98b4f';a.smooth=false;
@@ -1278,6 +1380,7 @@ try{if(localStorage.getItem('nugget-modeler-axes')==='0')axes.visible=false}catc
 rebuildAll();last=snap();select(null);btns();
 {let p=null;try{p=localStorage.getItem('nugget-modeler-phone')}catch(e){}
  setPhone(p?p==='1':(matchMedia('(pointer:coarse)').matches&&Math.min(innerWidth,innerHeight)<820))}
+initProjects();
 
 function resize(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();if(bloomOK){bloomComp.setSize(w,h);finalComp.setSize(w,h)}}
 const ro=new ResizeObserver(resize);ro.observe(vp);resize();

@@ -1067,7 +1067,7 @@ let bloomComp=null,finalComp=null;
 if(bloomOK){
  bloomComp=new THREE.EffectComposer(renderer);bloomComp.renderToScreen=false;
  bloomComp.addPass(new THREE.RenderPass(scene,camera));
- bloomComp.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(256,256),1.5,0.55,0));
+ bloomComp.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(256,256),1.2,0.5,0));
  const mix=new THREE.ShaderPass(new THREE.ShaderMaterial({
   uniforms:{baseTexture:{value:null},bloomTexture:{value:bloomComp.renderTarget2.texture}},
   vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
@@ -1084,7 +1084,15 @@ function renderFrame(){
  if(!any){renderer.render(scene,camera);return}
  // pass 1: only glowing parts, everything else black (see-through parts hidden so they don't block the glow)
  const mats=new Map(),hid=[];
- for(const [id,m] of meshes){const o=byId(id);if(!((o.glow||0)>0)){if((o.opacity??1)<1){if(m.visible){m.visible=false;hid.push(m)}}else{mats.set(m,m.material);m.material=BLACK}}}
+ for(const [id,m] of meshes){const o=byId(id),gl=o.glow||0;
+  if(gl>0){
+   // glow pass colour = part colour scaled by Brightness, so a small value gives a small halo
+   const gm=m.userData.gmat||(m.userData.gmat=new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));
+   gm.color.set(o.color).multiplyScalar(Math.min(1,gl*0.5));
+   const op=o.opacity??1;gm.transparent=op<1;gm.opacity=op;gm.depthWrite=op>=1;
+   mats.set(m,m.material);m.material=gm;
+  }
+  else if((o.opacity??1)<1){if(m.visible){m.visible=false;hid.push(m)}}else{mats.set(m,m.material);m.material=BLACK}}
  for(const x of [grid,axes,pivMark,tc,sh,helper,...xhelp,ed&&ed.pts])if(x&&x.visible){x.visible=false;hid.push(x)}
  bloomComp.render();
  for(const [m,mt] of mats)m.material=mt;hid.forEach(x=>x.visible=true);

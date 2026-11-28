@@ -783,6 +783,42 @@ function drawBox(){const s=boxEl.style;s.display='block';s.left=Math.min(box.x0,
 /* every part in the selection, with groups opened up into their parts */
 function selParts(){const out=new Map();for(const id of msel){const o=byId(id);if(!o)continue;(isG(o)?descOf(id):[o]).forEach(k=>{if(!isG(k))out.set(k.id,k)})}return[...out.values()]}
 
+/* ---------- Pull (vertex edit): press a point and drag to push that area out or in ---------- */
+let pullOn=true,pullR=0.35,pull=null;
+vp.addEventListener('pointerdown',e=>{
+ if(!edit||!ed||!pullOn||tDown||boxMode||sdrag||box||e.button>0)return;
+ if(tc.object&&tc.axis!==null)return; // grabbing the gizmo, not a point
+ const r=renderer.domElement.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,w=r.width,h=r.height;
+ const ra=ed.pts.geometry.attributes.position,mw=ed.m.matrixWorld,v=new THREE.Vector3();ed.m.updateWorldMatrix(true,true);
+ let best=-1,bd=18*18;
+ for(let g=0;g<ed.groups.length;g++){v.fromBufferAttribute(ra,g).applyMatrix4(mw).project(camera);if(v.z<-1||v.z>1)continue;const d=((v.x+1)/2*w-px)**2+((1-v.y)/2*h-py)**2;if(d<bd){bd=d;best=g}}
+ if(best<0)return;
+ e.stopPropagation();e.preventDefault();orbit.enabled=false;
+ // direction = the surface normal at that point
+ const na=ed.m.geometry.attributes.normal,n=new THREE.Vector3();for(const i of ed.groups[best])n.add(new THREE.Vector3().fromBufferAttribute(na,i));
+ if(n.lengthSq()<1e-9)n.set(0,1,0);n.normalize();
+ const c=new THREE.Vector3().fromBufferAttribute(ra,best);
+ const bb=new THREE.Box3().setFromBufferAttribute(ra),R=Math.max(1e-3,bb.getSize(new THREE.Vector3()).length()*pullR);
+ const aff=[];
+ for(let g=0;g<ed.groups.length;g++){const q=new THREE.Vector3().fromBufferAttribute(ra,g),d=q.distanceTo(c);if(d<R){const k=1-d/R;aff.push({g,o:q,w:k*k*(3-2*k)})}}
+ // how many screen pixels one unit along the normal covers, to turn finger movement into distance
+ const s1=c.clone().applyMatrix4(mw).project(camera),s2=c.clone().addScaledVector(n,.5).applyMatrix4(mw).project(camera);
+ const dir=new THREE.Vector2((s2.x-s1.x)*w/2,-(s2.y-s1.y)*h/2);let len=dir.length();if(len<2){dir.set(0,-1);len=40}
+ pull={g:best,x:e.clientX,y:e.clientY,n,aff,dir:dir.clone().normalize(),upp:.5/len,moved:false,px,py,shift:e.shiftKey||multi||tapAdd};
+},true);
+addEventListener('pointermove',e=>{
+ if(!pull)return;
+ const dx=e.clientX-pull.x,dy=e.clientY-pull.y;if(!pull.moved&&Math.hypot(dx,dy)<5)return;pull.moved=true;
+ const amt=(dx*pull.dir.x+dy*pull.dir.y)*pull.upp,pa=ed.m.geometry.attributes.position,ra=ed.pts.geometry.attributes.position,v=new THREE.Vector3();
+ for(const {g,o,w} of pull.aff){v.copy(o).addScaledVector(pull.n,amt*w);ra.setXYZ(g,v.x,v.y,v.z);for(const i of ed.groups[g])pa.setXYZ(i,v.x,v.y,v.z)}
+ pa.needsUpdate=ra.needsUpdate=true;const geo=ed.m.geometry;geo.computeVertexNormals();geo.computeBoundingSphere();geo.computeBoundingBox();ed.pts.geometry.computeBoundingSphere();
+});
+addEventListener('pointerup',()=>{
+ if(!pull)return;const P=pull;pull=null;if(!tDown&&!boxMode)orbit.enabled=true;
+ if(!P.moved){pickVert(P.px,P.py,P.shift);return} // a tap still picks the point
+ storeVerts();commit();if(ed.s.size)vertGizmo();
+});
+
 /* ---------- views ---------- */
 function view(k){
  const t=orbit.target,d=Math.max(2,camera.position.distanceTo(t)),o={vpersp:[.6,.5,.7],vtop:[0,1,.0001],vfront:[0,0,1],vright:[1,0,0]}[k];
@@ -851,6 +887,9 @@ function renderProps(){
   P.innerHTML=`<h3>Vertex edit</h3><p><b>${esc(o.name)}</b></p><p class="mut" id="vcount"></p>
   <label class="chk"><input type="checkbox" id="multi" ${multi?'checked':''}> Add to selection on each tap</label>
   <div class="tools"><button class="b" data-cmd="vall">Select all</button><button class="b" data-cmd="vnone">Deselect</button><button class="b" data-cmd="vcollapse">Collapse</button><button class="b" data-cmd="del">Delete</button><button class="b" data-cmd="overts">Pivot to picked</button></div>
+  <h3 class="s">Pull</h3>
+  <label class="chk"><input type="checkbox" id="pullOn" ${pullOn?'checked':''}> Press a point and drag to push that area out or in</label>
+  <label class="f"><span>Pull size</span><input type="range" id="pullR" min="0.05" max="1" step="0.01" value="${pullR}"></label>
   ${shapeUI(true)}
   <h3 class="s">Mesh tools</h3>
   <label class="f"><span>Noise amount</span><input type="number" id="noiseAmt" step="0.01" value="0.05"></label>
@@ -917,6 +956,8 @@ RP.addEventListener('input',e=>{
  if(t.id==='multi'){multi=t.checked;return}
  if(t.id==='shAmt'){shAmt=parseFloat(t.value)||0;return}
  if(t.id==='shAx'){shAx=+t.value;return}
+ if(t.id==='pullOn'){pullOn=t.checked;return}
+ if(t.id==='pullR'){pullR=+t.value;return}
  if(t.id==='softR'){softR=Math.max(0,parseFloat(t.value)||0);return}
  if(!o)return;
  if(t.id==='mCol'){selParts().forEach(p=>{p.color=t.value;updMat(p)});return}
@@ -930,7 +971,7 @@ RP.addEventListener('input',e=>{
  else if(t.id==='pGlow'){o.glow=+t.value;updMat(o)}
 });
 RP.addEventListener('change',e=>{
- const t=e.target,o=cur();if(!o||['multi','noiseAmt','shAmt','shAx','softR'].includes(t.id))return;
+ const t=e.target,o=cur();if(!o||['multi','noiseAmt','shAmt','shAx','softR','pullOn','pullR'].includes(t.id))return;
  if(t.id==='pParent'){reparent(t.dataset.ids.split(',').map(Number),t.value===''?null:+t.value);return}
  if(t.id==='pName'){rename(o,t.value);return}
  if(t.id==='pSmooth'){o.smooth=t.checked;updMat(o)}

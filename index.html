@@ -431,13 +431,19 @@ function addPrim(type){
  dropToFloor(o);select(o.id);commit();toast('Added '+o.name);
 }
 function dup(){
- const o=cur();if(!o)return;if(edit)exitEdit();
- // copies a group with everything inside it; parts inside keep their names so games can find them
- const idMap=new Map(),src=[o,...(isG(o)?descOf(o.id):[])];
- const copies=src.map(s=>{const c=JSON.parse(JSON.stringify(s));idMap.set(s.id,c.id=nid++);c.lock=false;return c});
- copies.forEach((c,i)=>{if(i)c.parent=idMap.get(c.parent)});
- const top=copies[0];top.name=uniqueName(o.name);
- objs.push(...copies);rebuildAll();select(top.id);commit();toast('Duplicated as '+top.name);
+ if(!cur())return;if(edit)exitEdit();
+ // copies everything selected (groups come with everything inside them); copies stay in the same spot
+ const tops=[...msel].filter(id=>byId(id)&&!ancestors(byId(id)).some(a=>msel.has(a.id)));
+ const newTops=[];
+ for(const tid of tops){
+  const o=byId(tid),idMap=new Map(),src=[o,...(isG(o)?descOf(o.id):[])];
+  const copies=src.map(s=>{const c=JSON.parse(JSON.stringify(s));idMap.set(s.id,c.id=nid++);c.lock=false;return c});
+  copies.forEach((c,i)=>{if(i)c.parent=idMap.get(c.parent)});
+  copies[0].name=uniqueName(o.name); // parts inside keep their names so games can find them
+  objs.push(...copies);newTops.push(copies[0].id);
+ }
+ rebuildAll();msel=new Set(newTops);sel=newTops[newTops.length-1];select(sel);commit();
+ toast(newTops.length>1?`Duplicated ${newTops.length} items (the copies are selected)`:'Duplicated as '+byId(sel).name);
 }
 function del(){
  if(edit)return delVerts();

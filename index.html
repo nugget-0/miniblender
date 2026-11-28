@@ -116,7 +116,7 @@ body.phone #dock{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc
   <button class="b" data-add="box">Cube</button><button class="b" data-add="sphere">Sphere</button><button class="b" data-add="cyl">Cylinder</button><button class="b" data-add="tube">Hollow Cyl</button><button class="b" data-add="cone">Cone</button><button class="b" data-add="pyr">Pyramid</button><button class="b" data-add="prism">Prism</button><button class="b" data-add="torus">Torus</button><button class="b" data-add="ico">Icosphere</button><button class="b" data-add="plane">Plane</button><button class="b" data-add="knot">Knot</button>
  </div>
  <div class="grp"><small>Tool</small>
-  <button class="b on" data-cmd="move">Move<kbd>W</kbd></button><button class="b" data-cmd="rotate">Rotate<kbd>E</kbd></button><button class="b" data-cmd="scale">Scale<kbd>R</kbd></button><button class="b" data-cmd="edit">Edit verts<kbd>Tab</kbd></button><button class="b" data-cmd="pivot">Pivot<kbd>P</kbd></button><button class="b" data-cmd="box">Box<kbd>hold T</kbd></button><button class="b" data-cmd="snap">Snap</button><button class="b" data-cmd="space">Local</button>
+  <button class="b on" data-cmd="move">Move<kbd>W</kbd></button><button class="b" data-cmd="rotate">Rotate<kbd>E</kbd></button><button class="b" data-cmd="scale">Scale<kbd>R</kbd></button><button class="b" data-cmd="edit">Edit verts<kbd>Tab</kbd></button><button class="b" data-cmd="pivot">Pivot<kbd>P</kbd></button><button class="b" data-cmd="round">Round</button><button class="b" data-cmd="box">Box<kbd>hold T</kbd></button><button class="b" data-cmd="snap">Snap</button><button class="b" data-cmd="space">Local</button>
  </div>
  <div class="grp"><small>Edit</small>
   <button class="b" data-cmd="undo">Undo</button><button class="b" data-cmd="redo">Redo</button><button class="b" data-cmd="dup">Duplicate</button><button class="b" data-cmd="del">Delete</button><button class="b" data-cmd="group">Group<kbd>Ctrl+G</kbd></button><button class="b" data-cmd="ungroup">Ungroup</button>
@@ -147,7 +147,7 @@ body.phone #dock{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc
 <footer><span id="stat"></span><span id="msg"></span></footer>
 <nav id="dock" aria-label="Phone tools">
  <button class="b" data-ph="menu">Menu</button><button class="b" data-ph="parts">Parts</button><button class="b" data-ph="props">Props</button><span class="sep"></span>
- <button class="b" data-cmd="move">Move</button><button class="b" data-cmd="rotate">Rotate</button><button class="b" data-cmd="scale">Scale</button><button class="b" data-cmd="pivot">Pivot</button><button class="b" data-cmd="edit">Verts</button><span class="sep"></span>
+ <button class="b" data-cmd="move">Move</button><button class="b" data-cmd="rotate">Rotate</button><button class="b" data-cmd="scale">Scale</button><button class="b" data-cmd="pivot">Pivot</button><button class="b" data-cmd="round">Round</button><button class="b" data-cmd="edit">Verts</button><span class="sep"></span>
  <button class="b" data-ph="multi">Multi</button><button class="b" data-cmd="box">Box</button><button class="b" data-cmd="group">Group</button><span class="sep"></span>
  <button class="b" data-cmd="undo">Undo</button><button class="b" data-cmd="redo">Redo</button><button class="b" data-cmd="dup">Copy</button><button class="b" data-cmd="del">Delete</button><button class="b" data-cmd="focus">Focus</button><span class="sep"></span>
  <button class="b" data-cmd="projects">Projects</button><button class="b pri" data-cmd="expjson">Export</button><button class="b" data-cmd="phone">PC mode</button>
@@ -441,7 +441,7 @@ function select(id,add){
   if(m&&effVis(o)){helper=new THREE.BoxHelper(m,0xe4572e);scene.add(helper)}
   for(const k of msel)if(k!==sel){const n=N(k);if(n&&effVis(byId(k))){const h=new THREE.BoxHelper(n,0xf3a712);scene.add(h);xhelp.push(h)}}
  }
- renderList();renderProps();hint();
+ renderList();renderProps();hint();refreshCorners();
 }
 
 /* ---------- objects ---------- */
@@ -967,6 +967,9 @@ function renderProps(){
  <h3 class="s">Tools</h3>
  <div class="tools"><button class="b" data-cmd="edit">Edit vertices</button><button class="b" data-cmd="floor">Drop to floor</button><button class="b" data-cmd="reset">Reset transform</button><button class="b" data-cmd="apply">Apply transform</button></div>
  <div class="tools"><button class="b" data-cmd="mx">Mirror X</button><button class="b" data-cmd="my">Mirror Y</button><button class="b" data-cmd="mz">Mirror Z</button></div>
+ <h3 class="s">Round corners</h3>
+ <label class="f"><span>Round size</span><input type="number" id="roundR" step="0.05" min="0.01" value="${roundR}"></label>
+ <div class="tools"><button class="b ${roundMode?'on':''}" data-cmd="round">${roundMode?'Done rounding':'Show corners'}</button><button class="b" data-cmd="roundall">Round all</button></div>
  ${shapeUI(false)}
  <label class="f"><span>Noise amount</span><input type="number" id="noiseAmt" step="0.01" value="0.05"></label>
  <div class="tools"><button class="b" data-cmd="noise">Add noise</button><button class="b" data-cmd="flip">Flip normals</button><button class="b" data-cmd="dup">Duplicate</button><button class="b" data-cmd="del">Delete</button></div>`;
@@ -978,6 +981,7 @@ RP.addEventListener('input',e=>{
  if(t.id==='multi'){multi=t.checked;return}
  if(t.id==='shAmt'){shAmt=parseFloat(t.value)||0;return}
  if(t.id==='shAx'){shAx=+t.value;return}
+ if(t.id==='roundR'){roundR=Math.max(0.01,parseFloat(t.value)||0.15);return}
  if(t.id==='pullOn'){pullOn=t.checked;return}
  if(t.id==='pullR'){pullR=+t.value;return}
  if(t.id==='softR'){softR=Math.max(0,parseFloat(t.value)||0);return}
@@ -993,7 +997,7 @@ RP.addEventListener('input',e=>{
  else if(t.id==='pGlow'){o.glow=+t.value;updMat(o)}
 });
 RP.addEventListener('change',e=>{
- const t=e.target,o=cur();if(!o||['multi','noiseAmt','shAmt','shAx','softR','pullOn','pullR'].includes(t.id))return;
+ const t=e.target,o=cur();if(!o||['multi','noiseAmt','shAmt','shAx','softR','pullOn','pullR','roundR'].includes(t.id))return;
  if(t.id==='pParent'){reparent(t.dataset.ids.split(',').map(Number),t.value===''?null:+t.value);return}
  if(t.id==='pName'){rename(o,t.value);return}
  if(t.id==='pSmooth'){o.smooth=t.checked;updMat(o)}
@@ -1009,11 +1013,12 @@ RP.addEventListener('change',e=>{
 /* ---------- toolbar / commands ---------- */
 function setMode(m){pivMode=false;mode=m;tc.setMode(m);if(!edit)select(sel);btns();hint()}
 function btns(){
- const on={move:mode==='translate'&&!pivMode,rotate:mode==='rotate'&&!pivMode,scale:mode==='scale'&&!pivMode,edit,pivot:pivMode,box:boxMode,phone,glowfx:glowOn,snap:snapOn,space:local,grid:grid.visible,axes:axes.visible,wireall:wireAll};
+ const on={move:mode==='translate'&&!pivMode,rotate:mode==='rotate'&&!pivMode,scale:mode==='scale'&&!pivMode,edit,pivot:pivMode,box:boxMode,round:roundMode,phone,glowfx:glowOn,snap:snapOn,space:local,grid:grid.visible,axes:axes.visible,wireall:wireAll};
  for(const b of document.querySelectorAll('header [data-cmd],#dock [data-cmd]'))if(b.dataset.cmd in on)b.classList.toggle('on',on[b.dataset.cmd]);
 }
 function hint(){
  const o=cur();
+ if(roundMode&&!edit){$('#hint').textContent=o&&!isG(o)?`${o.name} · Round: tap a yellow dot to round that corner`:'Round: select a part to see its corners';return}
  if(pivMode&&o){$('#hint').textContent=`${o.name} · Pivot mode: drag to place the pivot`;return}
  $('#hint').textContent=edit?`Vertex edit · ${ed.o.name} · ${({translate:'Move',rotate:'Rotate',scale:'Scale'})[mode]}`:(o?`${o.name} · ${({translate:'Move',rotate:'Rotate',scale:'Scale'})[mode]}${o.lock?' · locked':mode==='scale'?' · drag a dot to stretch that side (Shift = both sides)':''}`:'Object mode · click a shape to select');
 }
@@ -1035,6 +1040,7 @@ const CMD={
  sh_taper:()=>shapeOp('taper','Taper'),sh_twist:()=>shapeOp('twist','Twist'),sh_bend:()=>shapeOp('bend','Bend'),sh_spherize:()=>shapeOp('spherize','Spherize'),
  sh_inflate:()=>shapeOp('inflate','Inflate'),sh_smooth:()=>shapeOp('smooth','Smooth'),sh_subdiv:()=>shapeOp('subdiv','Subdivide'),sh_extrude:()=>shapeOp('extrude','Extrude'),
  sh_flatx:()=>shapeOp('flat','Flatten X',0),sh_flaty:()=>shapeOp('flat','Flatten Y',1),sh_flatz:()=>shapeOp('flat','Flatten Z',2),
+ round:toggleRound,roundall:roundAll,
  group:groupSel,ungroup,selkids:selKids,desel:()=>select(null),
  vall:selAllVerts,vnone:()=>{if(ed){ed.s.clear();vertGizmo()}},vcollapse:collapse,
  export:openExport,close:()=>{$('#modal').hidden=true},
@@ -1286,6 +1292,60 @@ $('#dock').addEventListener('click',e=>{
 // after adding a shape or running a menu command, close the menu sheet so the view is visible
 $('header').addEventListener('click',e=>{if(phone&&e.target.closest('[data-add],[data-cmd]')&&!e.target.closest('[data-cmd=phone]'))closeSheets()});
 
+/* ---------- Round tool: dots on a part's corners, tap one to round it off ---------- */
+let roundMode=false,roundR=0.15,corners=[];
+const cornerMk=new THREE.Group();cornerMk.visible=false;scene.add(cornerMk);
+const CMK=[];for(let i=0;i<8;i++){const m=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xffd23f,depthTest:false}));m.renderOrder=9;m.visible=false;m.userData.i=i;cornerMk.add(m);CMK.push(m)}
+function refreshCorners(){
+ corners=[];const o=cur(),m=o&&!isG(o)&&meshes.get(o.id);
+ if(!roundMode||!m||edit){cornerMk.visible=false;return}
+ const g=m.geometry;g.computeBoundingBox();const b=g.boundingBox,pa=g.attributes.position,sz=b.getSize(new THREE.Vector3()),tol=Math.max(sz.x,sz.y,sz.z)*0.01+1e-5;
+ for(let i=0;i<8;i++){
+  const s=[i&1?1:-1,i&2?1:-1,i&4?1:-1],c=new THREE.Vector3(s[0]>0?b.max.x:b.min.x,s[1]>0?b.max.y:b.min.y,s[2]>0?b.max.z:b.min.z);
+  if(o.type==='box'){corners.push({c,s});continue} // cubes always show all 8, even after rounding a neighbour
+  for(let v=0;v<pa.count;v++)if(Math.abs(pa.getX(v)-c.x)<tol&&Math.abs(pa.getY(v)-c.y)<tol&&Math.abs(pa.getZ(v)-c.z)<tol){corners.push({c,s});break}
+ }
+ cornerMk.visible=true;
+}
+function updCorners(){
+ if(!cornerMk.visible)return;const m=meshes.get(sel);if(!m){cornerMk.visible=false;return}
+ m.updateWorldMatrix(true,false);
+ CMK.forEach((mk,i)=>{const k=corners[i];mk.visible=!!k;if(!k)return;mk.position.copy(k.c).applyMatrix4(m.matrixWorld);mk.scale.setScalar(camera.position.distanceTo(mk.position)*(phone?.03:.02))});
+}
+function roundCorner(o,k,quiet){
+ const g0=meshes.get(o.id).geometry;g0.computeBoundingBox();const sz=g0.boundingBox.getSize(new THREE.Vector3());
+ const r=Math.max(0.001,Math.min(roundR,Math.min(sz.x,sz.y,sz.z)*0.499));
+ // need enough points along the edges for a smooth curve
+ if(!o.custom&&o.type==='box'){const P=o.params,seg=Math.min(48,Math.max(P.seg,Math.ceil(Math.max(P.w,P.h,P.d)/(r/4))));if(seg!==P.seg){P.seg=seg;replaceGeo(o)}}
+ makeEditable(o);weld(o);
+ for(let n=0;n<4;n++){const p=o.custom.p,I=o.custom.i;let L=0;
+  for(let t=0;t<I.length;t+=3)for(const [a,b] of [[I[t],I[t+1]],[I[t+1],I[t+2]],[I[t+2],I[t]]])L=Math.max(L,Math.hypot(p[a*3]-p[b*3],p[a*3+1]-p[b*3+1],p[a*3+2]-p[b*3+2]));
+  if(L<=r/2.5||I.length/3*4>60000)break;SHAPE.subdiv(o,null)}
+ // squeeze points near that corner onto a rounded surface: sphere at the corner, cylinders along its edges
+ const p=o.custom.p,{c,s}=k,b=[0,1,2].map(i=>c.getComponent(i)-s[i]*r);
+ for(let v=0;v<p.length/3;v++){
+  const q=[0,0,0],d=[0,0,0];let n=0;
+  for(let i=0;i<3;i++){const x=p[v*3+i];if(s[i]*(x-b[i])>1e-7){q[i]=b[i];d[i]=x-b[i];n++}else q[i]=x}
+  if(n<2)continue;const l=Math.hypot(...d)||1;for(let i=0;i<3;i++)p[v*3+i]=r4(q[i]+d[i]/l*r);
+ }
+ weld(o);o.smooth=true;replaceGeo(o);updMat(o);
+ if(!quiet){commit();refreshCorners();renderProps();toast('Corner rounded (Ctrl+Z to undo)')}
+}
+function roundAll(){
+ const o=cur();if(!o||isG(o))return toast('Select a part first');
+ const was=roundMode;roundMode=true;refreshCorners();const list=corners.slice();roundMode=was;
+ if(!list.length){refreshCorners();return toast('No sharp box corners found on this part')}
+ list.forEach(k=>roundCorner(o,k,true));commit();refreshCorners();renderProps();toast(`Rounded ${list.length} corners`);
+}
+function toggleRound(){if(edit)exitEdit();roundMode=!roundMode;refreshCorners();btns();hint();
+ if(roundMode)toast(cur()&&!isG(cur())?(corners.length?'Tap a yellow dot to round that corner':'No box corners on this part. Round works on cube-shaped parts.'):'Select a part to see its corners')}
+vp.addEventListener('pointerdown',e=>{
+ if(!roundMode||!cornerMk.visible||e.button>0)return;
+ rayAt(e);const hit=ray.intersectObjects(CMK.filter(m=>m.visible),false)[0];if(!hit)return;
+ e.stopPropagation();e.preventDefault();
+ const o=cur(),k=corners[hit.object.userData.i];if(o&&k)roundCorner(o,k);
+},true);
+
 /* ---------- projects (IndexedDB): many separate scenes, each autosaved ---------- */
 const IDB={db:null,
  open(){return new Promise((res,rej)=>{if(!window.indexedDB)return rej(new Error('no idb'));const r=indexedDB.open('nugget-modeler',1);
@@ -1385,7 +1445,7 @@ initProjects();
 function resize(){const w=vp.clientWidth,h=vp.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();if(bloomOK){bloomComp.setSize(w,h);finalComp.setSize(w,h)}}
 const ro=new ResizeObserver(resize);ro.observe(vp);resize();
 (function loop(){requestAnimationFrame(loop);if((boxMode||tDown||box)&&!tc.dragging)orbit.enabled=false;orbit.update();if(helper)helper.update();updHandles();
- xhelp.forEach(h=>h.update());
+ xhelp.forEach(h=>h.update());updCorners();
  {const o=cur(),m=o&&N(o.id);pivMark.visible=!!(m&&effVis(o));
   if(pivMark.visible){if(pivMode&&tc.object===pivDummy)pivMark.position.copy(pivDummy.position);else m.getWorldPosition(pivMark.position);m.getWorldQuaternion(pivMark.quaternion)}}
  renderFrame()})();
